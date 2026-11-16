@@ -281,17 +281,22 @@ async function main() {
     if (typeof evalMod.evaluate !== 'function') {
       throw new Error('搭配的评价组件未导出 evaluate(rawArtifacts, spec, params)');
     }
-    const hostMap = solverVerifiedHostModules || verifiedHostModules;
-    const opticsMod =
-      hostMap && hostMap['src/core/optics.ts']
-        ? await importVerifiedOpticsHostModule(hostMap)
-        : await import('../src/core/optics.ts');
+    if (!verifiedHostModules || !verifiedHostModules['src/core/optics.ts']) {
+      throw new Error(
+        '宿主模块安全校验失败 (optimizer)：未提供已校验的优化器宿主模块 src/core/optics.ts 字节，禁止从磁盘加载',
+      );
+    }
+    const optOpticsMod = await importVerifiedOpticsHostModule(verifiedHostModules);
+    const solverOpticsMod =
+      solverId === 'solver-optiland-python'
+        ? null
+        : await importVerifiedOpticsHostModule(solverVerifiedHostModules || verifiedHostModules);
     const pythonBridgePath =
       process.env.OPENLAB_OPTILAND_BRIDGE || path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
-    const traceFn = buildTraceHelper(solverId, pythonBridgePath, opticsMod);
+    const traceFn = buildTraceHelper(solverId, pythonBridgePath, solverOpticsMod);
     const helpers = {
-      extractVariables: opticsMod.extractVariables,
-      applyVariableVector: opticsMod.applyVariableVector,
+      extractVariables: optOpticsMod.extractVariables,
+      applyVariableVector: optOpticsMod.applyVariableVector,
       trace: traceFn,
       evaluate: (t, s) => evalMod.evaluate(t, s, evalParams || {}),
     };

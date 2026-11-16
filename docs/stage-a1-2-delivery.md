@@ -8,27 +8,30 @@
 ## 一、五项核心加固与工程落地
 
 ### 1. CAS 对象篡改与缺失检测、恢复与降级策略（A1.2.0）
-- **内容寻址存储（CAS）**：所有 `frozen` 版本在冻结时均将其主入口源码及相对依赖文件按完整 64 位小写 SHA-256 摘要写入 `workspace/immutable_store/sha256/<sha256>`。
+- **内容寻址存储（CAS）**：所有 `frozen` 版本在冻结时均将其主入口源码、相对依赖文件（`pinnedRelativeDeps`）及声明宿主模块（`pinnedHostModules`）按完整 64 位小写 SHA-256 摘要写入 `workspace/immutable_store/sha256/<sha256>`。
 - **读取与诊断分层（`server/storage.ts`）**：
   - `inspectCasBlob(expectedHash, workspaceDir)`：无异常抛出地返回 CAS 状态（`valid` / `missing` / `corrupted` / `unpinned`），用于在组件档案与工作台诊断中如实暴露 `casIntegrityStatus` 与 `casTamperDetected`，避免清单接口崩溃。
   - `readCasBlob(expectedHash, workspaceDir)`：严格校验实际字节 SHA-256 与预期 `immutableBlobHash` 是否一致；若 CAS 对象字节被篡改则立即抛出错误，**缺失返回 `null`，篡改直接拒绝**。
-- **执行侧校验策略（`server/runner.ts` `resolveAndAssertApproved`）**：
-  - 对于已固定 `immutableBlobHash` 的 `frozen` 版本，执行前**优先校验 CAS Blob**。即使磁盘工作区副本仍然完好，一旦 CAS 对象本身被篡改，也**绝不静默掩盖或回退到磁盘**，直接报错阻断执行；
-  - 仅当 CAS 对象缺失（`null`）且磁盘工作区文件完整匹配已固定的 `codeHash` 时，才允许回退读取经哈希校验的磁盘副本；若磁盘亦不匹配或缺失，则阻断执行。
+- **执行侧统一回退策略（`server/runner.ts` `resolveAndAssertApproved`）**：
+  - **篡改零容忍（Fail-Closed on Tamper）**：对于已固定 `immutableBlobHash` 的 `frozen` 版本（含主源码、`pinnedRelativeDeps`、`pinnedHostModules`），执行前**优先校验 CAS Blob**。即使磁盘工作区副本完好，一旦任一 CAS 对象本身被篡改，也**绝不静默掩盖或回退到磁盘**，直接报错阻断执行；
+  - **CAS 缺失时的严格哈希回退（Strict SHA-256 Verified Disk Fallback on Missing CAS）**：主源码、`pinnedRelativeDeps` 与 `pinnedHostModules` 三者保持完全一致的策略——仅当 CAS 对象缺失（`null`）且对应磁盘副本完整存在并精确匹配已固定的 64 位 `codeHash` 时，才允许读取经哈希验证的磁盘字节（此时标记 `executedFromCas: false`）；若磁盘副本亦缺失或哈希不匹配，则明确阻断执行。
 - **工作区恢复（`restoreFrozenComponentWorkspaceFile`）**：
   - 从经 `readCasBlob` 验证的 CAS 不可变对象同时恢复主入口文件与全部 `pinnedRelativeDeps` 到 `workspace/components/<id>/<version>/`，保留可编辑 `draft` 目录不受影响；若 CAS 对象已损坏或缺失则拒绝恢复。
 
-### 2. Frozen 组件相对依赖固定与 TOCTOU-Free 内存执行（A1.2.0）
+### 2. Frozen 组件相对依赖与优化器/求解器宿主模块固定、无 `fileUrl` 内存执行（A1.2.0）
 - **构建/冻结期相对依赖发现与固定（`server/storage.ts`）**：
   - `discoverLocalRelativeDependencies` 对组件版本目录内的 ESM 相对导入（`./*`、`../*`）进行广度优先扫描（BFS），计算每个本地相对依赖的 `codeHash` 与 `immutableBlobHash` 并固化为 `ComponentVersionRecord.pinnedRelativeDeps`；
   - **路径逃逸拦截**：任何未在组件 `dossier.dependencies` 中显式声明的 `../` 越界相对路径立即抛出 `组件相对依赖越界`；缺失文件抛出 `组件相对依赖缺失`；
 - **宿主机核心模块独立固定与 CAS 归档（`pinnedHostModules`）**：
   - `ComponentVersionRecord.pinnedHostModules` 独立记录每个声明宿主机核心模块的 `targetId`、`codeHash`（64 位 SHA-256）、`immutableBlobHash` 与 `casPath`（`immutable_store/sha256/<hash>`）；
-  - `discoverDeclaredHostModules` 仅放行组件 `dependencies` 中显式声明为 `{ kind: 'module', targetId: 'src/core/*' }` 的模块（例如 `solver-ts-preview@v0.1` 依赖的 `src/core/optics.ts`）；冻结或历史迁移时将其完整源码字节同步写入 CAS；
-  - `hydrateDossierLiveState` 同时检测 `src/core/*` 磁盘副本漂移（`hostModulesWorkspaceModified`、`hostModuleDriftDetected`）与宿主模块 CAS 对象完整性。
-- **无盘 TOCTOU 与无 `fileUrl` 内存 `data URL` 执行（`server/runner.ts` + `server/mjs_harness.mjs`）**：
-  - `resolveAndAssertApproved` 一次性完成主入口、全部 `pinnedRelativeDeps` 及 `pinnedHostModules` 的 CAS/SHA-256 校验，并将经校验的原始字节传入子进程 `mjs_harness.mjs`；当主/宿 CAS 对象被篡改，或 CAS 与磁盘副本均缺失/不匹配时，明确阻断执行；
-  - `compileVerifiedModuleTree` 与 `compileVerifiedHostModule` 通过 Node 内置 `stripTypeScriptTypes` 与 `data:text/javascript;base64,...` 将组件局部依赖树与声明宿主模块（如 `src/core/optics.ts`）编译为内存 `data URL` 执行，**不再通过 `fileUrl` 加载宿主模块，也不在 harness 启动时静态导入磁盘 `src/core/optics.ts`**。
+  - `discoverDeclaredHostModules` 仅放行组件 `dependencies` 中显式声明为 `{ kind: 'module', targetId: 'src/core/*' }` 的模块；不仅 `solver-ts-preview@v0.1` 声明并固定 `src/core/optics.ts`，**优化器组件（`opt-nelder-mead@v0.1`、`opt-coordinate-refine@v0.1`）亦显式声明依赖 `src/core/optics.ts`（用于 `extractVariables` / `applyVariableVector`）并在冻结时将其固定至 CAS**；
+  - `hydrateDossierLiveState` 同时检测 `src/core/*` 磁盘副本漂移（`hostModulesWorkspaceModified`、`hostModuleDriftDetected`）与宿主模块 CAS 对象完整性；`saveComponentDossier` 与 `a1_migrate.ts` 均完整剥离全部瞬态字段（含 `hostModuleDriftDetected` 与 `hostModulesWorkspaceModified`）。
+- **无盘 TOCTOU、无 `fileUrl` 且移除未验证磁盘导入兜底的内存 `data URL` 执行（`server/runner.ts` + `server/mjs_harness.mjs`）**：
+  - `resolveAndAssertApproved` 一次性完成主入口、全部 `pinnedRelativeDeps` 及 `pinnedHostModules` 的 CAS/SHA-256 校验，并将经校验的原始字节传入子进程 `mjs_harness.mjs`；
+  - `mjs_harness.mjs` 中的 `action === 'optimize'` **已彻底移除 `await import('../src/core/optics.ts')` 磁盘兜底路径**：优化器的 `extractVariables` / `applyVariableVector` 强制从优化器自身经校验的 `verifiedHostModules['src/core/optics.ts']` 内存 `data:` URL 加载（若缺失则直接报错阻断）；即使搭配 `solver-optiland-python`（无 TS 宿主模块）并在磁盘删除 `src/core/optics.ts`，优化器依然使用自身 CAS 固定的字节完成变量提取与更新。
+- **Node 最低版本声明与 TS 语法约束（`package.json`）**：
+  - `package.json` 已显式声明 `"engines": { "node": ">=22.13.0" }`（对应 Node 内置 `module.stripTypeScriptTypes()` 最低支持版本）；
+  - 宿主模块 `src/core/*` 约束为纯类型可擦除 TypeScript（Type-Only Erasable Syntax，不使用 `enum`、`namespace` 或参数属性等需代码生成的语法）。
 
 ### 3. 迁移异常回滚与进程崩溃恢复的机制区分（A1.2.1）
 | 维度 | 迁移异常回滚（In-Process Exception Rollback） | 进程崩溃恢复（Durable Crash Recovery Journal） |
@@ -55,11 +58,11 @@
 
 | 检查项 | 执行命令 / 工具 | 结果 | 关键指标 / 输出 |
 | :--- | :--- | :--- | :--- |
-| **全量单元测试** | `node --test server/a0_audit.test.ts server/a1_models.test.ts server/a1_2_0_cas.test.ts server/a1_migrate.test.ts server/runner.test.ts src/core/*.test.ts` | **通过 (25 / 25)** | `tests 25`, `pass 25`, `fail 0`, `duration_ms 5116.890052` |
+| **全量单元测试** | `node --test server/a0_audit.test.ts server/a1_models.test.ts server/a1_2_0_cas.test.ts server/a1_migrate.test.ts server/runner.test.ts src/core/*.test.ts` | **通过 (25 / 25)** | `tests 25`, `pass 25`, `fail 0`, `duration_ms 6220.707383` |
 | **前端与服务端构建** | `compile_applet` (`vite build`) | **通过** | `Build succeeded - the applet is compiled` |
 | **TypeScript 类型检查** | `lint_applet` (`tsc --noEmit`) | **通过** | `Linting completed successfully ($ tsc --noEmit)` |
-| **真实工作区迁移与幂等性** | `migrateWorkspaceToStageA1('workspace')` 连续执行两次 | **通过** | `res1.status = "migrated"`、`res2.success = true`、两次全局状态哈希 **100% 一致**；`.migration_tmp` 无残留 |
-| **架构地图自检** | `buildArchitectureMap` 扫描迁移后 `workspace/` | **通过** | `51` 节点、`108` 条边；0 个篡改/损坏告警；仅 2 条预期 `info`（`opt-coordinate-refine` 未在历史 run 调用、`solver-optiland-python` 当前容器无 Python/Optiland） |
+| **真实工作区迁移与幂等性** | `migrateWorkspaceToStageA1('workspace')` 连续执行两次 | **通过** | `res1.success = true`、`res2.success = true`、两次全局状态哈希 **100% 一致**；`.migration_tmp` 无残留 |
+| **架构地图自检** | `buildArchitectureMap` 扫描迁移后 `workspace/` | **通过** | 0 个篡改/损坏告警；仅 2 条预期 `info`（`opt-coordinate-refine` 未在历史 run 调用、`solver-optiland-python` 当前容器无 Python/Optiland） |
 
 > 注：以上单元测试均在隔离临时目录运行，并在测试结束后清理临时工作区，未对真实 `workspace/` 产生测试污染。
 
@@ -84,7 +87,7 @@
 | CAS 对象（完整 SHA-256 文件名 / 摘要） | 字节数 | 对应组件版本 / 宿主模块 |
 | :--- | ---: | :--- |
 | `0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b` | 3,062 | `eval-rms-spot@v0.1/impl.mjs` |
-| `1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51` | 19,058 | `src/core/optics.ts`（`solver-ts-preview@v0.1` `pinnedHostModules`） |
+| `1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51` | 19,058 | `src/core/optics.ts`（`solver-ts-preview@v0.1` 与 `opt-nelder-mead@v0.1` `pinnedHostModules`） |
 | `5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a` | 4,078 | `opt-nelder-mead@v0.1/impl.mjs` |
 | `7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52` | 1,030 | `solver-ts-preview@v0.1/impl.mjs` |
 | `cd2ebd44bea79fbfe686a44281294f6a36212c4fbc7c095fce3c8f92ccb18383` | 2,485 | `analysis-aberration-summary@v0.1/impl.mjs` |
@@ -112,12 +115,12 @@
 ## 四、尚存缺口、风险与不确定性
 
 1. **宿主机依赖缺口（Python / Optiland 缺失）**：当前运行容器检测结果为 `Python=none, Optiland=none`，因此 `solver-optiland-python` 无法在本机真实执行专业光学求解，只能返回真实环境不可用报告；跨环境验证仍需在具备 Python >= 3.11 + `optiland` 的机器上补做。
-2. **历史遗留源码与哈希漂移不可逆**：
+2. **宿主模块 TypeScript 语法边界**：`server/mjs_harness.mjs` 使用 Node >= 22.13.0 内置的 `module.stripTypeScriptTypes()`（当前稳定性为 Active Development）将宿主 `.ts` 模块剥离类型后通过内存 `data:` URL 执行；该 API 默认仅做类型擦除，不支持 `enum`、`namespace` 或构造函数参数属性等需要代码生成的 TypeScript 语法，因此 `src/core/*` 宿主模块须保持可擦除类型语法。
+3. **历史遗留源码与哈希漂移不可逆**：
    - `eval-rms-spot@v0.1` 在 `run-001` 时记录的哈希（`a3b03826e7ce6dccbaac59ab5eb8f46b479bbd41b3ce7a3817f66939ce062b55`）与现存磁盘源码（`0b2d5359...`）不一致，原始旧版源码已无法追溯找回，当前 CAS 冻结的是现存磁盘版本并已标注 `historical_hash_drifted`；
    - `eval-rms-spot@v0.2` 的历史源码缺失（`missing_on_disk`、`immutableBlobHash: null`），无法凭空恢复，仅支持从现有可读取版本 Fork 新建 `draft`。
-3. **文件系统崩溃持久性边界**：`atomicWriteFileSync` 与 `journal.json` 使用同分区临时文件 + `renameSync`，可防御进程级 `SIGKILL` 或异常中断；但尚未对父目录显式执行 `fs.fsyncSync` 刷盘屏障，在宿主机内核断电丢失未落盘元数据缓存的极端场景下仍存在文件系统依赖边界。
-4. **运行隔离边界说明**：`mjs_harness.mjs` 通过 `execFile` 独立子进程 + 内存 `data:` URL 编译 + 哈希校验避免 TOCTOU 与隐式 `../` 模块加载，但 `execFile` 仍属于进程级隔离而非操作系统级沙箱（未引入 seccomp / 容器网络文件系统隔离，组件如主动调用宿主机 `fs`/`child_process` 仍受 Node 进程权限限制）。
-5. **后续阶段待建范围（Stage B / C / D）**：
-   - 尚无 Research Map / Branch / ResearchObject / Snapshot 对应的 Express API 路由与前端交互视图；
-   - `ComponentLab` 与 `ArchitectureMap` 前端展示尚待接入 `casIntegrityStatus`、`casTamperDetected` 与 `pinnedRelativeDeps` 诊断详情；
-   - Domain Adapter 多学科抽象（如天文测光真实组件落地）尚未进入实际构建。
+4. **文件系统崩溃持久性边界**：`atomicWriteFileSync` 与 `journal.json` 使用同分区临时文件 + `renameSync`，可防御进程级 `SIGKILL` 或异常中断；但尚未对父目录显式执行 `fs.fsyncSync` 刷盘屏障，在宿主机内核断电丢失未落盘元数据缓存的极端场景下仍存在文件系统依赖边界。
+5. **运行隔离边界说明**：`mjs_harness.mjs` 通过 `execFile` 独立子进程 + 内存 `data:` URL 编译 + 哈希校验避免 TOCTOU 与隐式 `../` 模块加载，但 `execFile` 仍属于进程级隔离而非操作系统级沙箱（未引入 seccomp / 容器网络文件系统隔离，组件如主动调用宿主机 `fs`/`child_process` 仍受 Node 进程权限限制）。
+6. **后续阶段推进重点（Stage B：研究工作循环）**：
+   - Stage A1.2 至此正式收口，不再扩张底层基础设施范围；
+   - Stage B 聚焦打通 `ResearchObject`（研究问题与判据）→ `ResearchSnapshot`（研究状态）→ `Branch`（探索路线）→ `ExperimentRun`（实际尝试与证据）→ **显式采纳产生新 Snapshot（同时完整保留未采纳与失败探索）** 的真实研究工作循环，并与 `ArchitectureMap` 横向关联。

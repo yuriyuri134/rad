@@ -660,17 +660,32 @@ test('A1.2.0: pinnedHostModules pins declared src/core/optics.ts into CAS, execu
     process.env.OPENLAB_REPO_ROOT = tmpRepo;
     ensureWorkspaceInitialized(tmpWs);
 
-    // 1. Freezing solver-ts-preview@v0.1 pins src/core/optics.ts into pinnedHostModules & CAS
+    // 1. Freezing solver-ts-preview@v0.1 AND opt-nelder-mead@v0.1 pins src/core/optics.ts into pinnedHostModules & CAS
     const frozenDossier = freezeComponentVersion(
       'solver-ts-preview',
       'v0.1',
       { runId: 'run-host-cas' },
       tmpWs,
     );
+    const frozenOptDossier = freezeComponentVersion(
+      'opt-nelder-mead',
+      'v0.1',
+      { runId: 'run-host-cas' },
+      tmpWs,
+    );
     const frozenVer = frozenDossier.versions.find((v) => v.version === 'v0.1')!;
+    const frozenOptVer = frozenOptDossier.versions.find((v) => v.version === 'v0.1')!;
     assert.equal(frozenVer.lifecycle, 'frozen');
+    assert.equal(frozenOptVer.lifecycle, 'frozen');
     assert.equal(frozenVer.pinnedHostModules?.length, 1);
+    assert.equal(frozenOptVer.pinnedHostModules?.length, 1);
     assert.deepEqual(frozenVer.pinnedHostModules?.[0], {
+      targetId: 'src/core/optics.ts',
+      codeHash: originalOpticsHash,
+      immutableBlobHash: originalOpticsHash,
+      casPath: `immutable_store/sha256/${originalOpticsHash}`,
+    });
+    assert.deepEqual(frozenOptVer.pinnedHostModules?.[0], {
       targetId: 'src/core/optics.ts',
       codeHash: originalOpticsHash,
       immutableBlobHash: originalOpticsHash,
@@ -708,6 +723,71 @@ test('A1.2.0: pinnedHostModules pins declared src/core/optics.ts into CAS, execu
     assert.notEqual(fileUrlRejectOut.code, 0);
     assert.match(fileUrlRejectOut.stderr, /禁止通过 fileUrl 加载|缺少经校验的 code 字节/);
 
+    // Harness MUST reject action === 'optimize' if verifiedHostModules is missing (no disk import fallback!)
+    const optCtx = resolveAndAssertApproved('opt-nelder-mead', 'v0.1', tmpWs);
+    const evalCtx = resolveAndAssertApproved('eval-rms-spot', 'v0.1', tmpWs);
+    const unpinnedOptimizeOut = await runHarnessDirect({
+      action: 'optimize',
+      implPath: optCtx.implPath,
+      verifiedCode: optCtx.verifiedCode,
+      expectedCodeHash: optCtx.verifiedHash,
+      verifiedRelativeDeps: optCtx.verifiedRelativeDeps,
+      verifiedHostModules: {},
+      solverVerifiedHostModules: {},
+      evalImplPath: evalCtx.implPath,
+      evalVerifiedCode: evalCtx.verifiedCode,
+      expectedEvalCodeHash: evalCtx.verifiedHash,
+      evalVerifiedRelativeDeps: evalCtx.verifiedRelativeDeps,
+      evalVerifiedHostModules: evalCtx.verifiedHostModules,
+      params: optCtx.ver.params,
+      evalParams: evalCtx.ver.params,
+      solverId: 'solver-optiland-python',
+      initialSpec: INITIAL_SINGLET_SPEC,
+    });
+    assert.notEqual(unpinnedOptimizeOut.code, 0);
+    assert.match(unpinnedOptimizeOut.stderr, /宿主模块安全校验失败 \(optimizer\)|禁止从磁盘加载/);
+
+    // Create a mock python bridge to verify solver-optiland-python + opt-nelder-mead optimization path
+    const mockBridgePath = path.join(tmpRepo, 'mock_optiland_bridge.py');
+    fs.writeFileSync(
+      mockBridgePath,
+      `#!/usr/bin/env python3
+import json, sys
+payload = json.loads(sys.stdin.read() or "{}")
+spec = payload.get("systemSpec", {})
+surfaces = spec.get("surfaces", [])
+r1 = float(surfaces[0].get("radiusMm", 72.0)) if len(surfaces) > 0 else 72.0
+efl = 100.0 + (r1 - 60.0) * 0.4
+rms = abs(r1 - 60.0) * 1.5 + 12.0
+print(json.dumps({
+  "status": "ok",
+  "result": {
+    "solverEngine": "optiland",
+    "paraxialEflMm": round(efl, 4),
+    "paraxialBflMm": 95.0,
+    "fNumber": 4.0,
+    "imagePlaneZMm": 100.0,
+    "totalLengthMm": 105.0,
+    "rmsSpotRadiusUm": round(rms, 4),
+    "rmsSpotByWavelengthUm": {"587.6": round(rms, 4)},
+    "longitudinalSphericalAberrationMm": 0.1,
+    "axialChromaticShiftMm": 0.2,
+    "mtf30LpMm": 0.5,
+    "mtf60LpMm": 0.3,
+    "mtfCurve": [],
+    "clippedRayCount": 0,
+    "tirRayCount": 0,
+    "totalRayCount": 21,
+    "meridionalRays": [],
+    "spotPoints": [],
+    "aberrationFan": [],
+    "surfaceVerticesZ": [0, 5.5]
+  }
+}))
+`,
+      'utf8',
+    );
+
     // 2. Modify src/core/optics.ts on disk with sabotaged return values -> MUST still execute pinned CAS bytes via memory data URL
     const sabotagedOpticsCode = `export function traceOpticalSystem() {
   return {
@@ -744,6 +824,9 @@ export function applyVariableVector(s) { return s; }
     assert.equal(verAfterEdit.hostModulesWorkspaceModified, true);
     assert.equal(verAfterEdit.casAvailable, true);
 
+    const optCompAfterEdit = getComponent('opt-nelder-mead', tmpWs)!;
+    assert.equal(optCompAfterEdit.dossier.hostModuleDriftDetected, true);
+
     const checkAfterEdit = await runComponentSelfCheck('solver-ts-preview', 'v0.1', tmpWs);
     assert.equal(checkAfterEdit.dossier.selfCheck.status, 'passed');
     assert.match(checkAfterEdit.dossier.selfCheck.summary, /96\.8/);
@@ -763,7 +846,8 @@ export function applyVariableVector(s) { return s; }
     assert.ok(optAfterEdit.history.length >= 2);
     assert.ok(optAfterEdit.bestTrace.paraxialEflMm > 50 && optAfterEdit.bestTrace.paraxialEflMm < 200);
 
-    // 3. DELETE src/core/optics.ts completely -> MUST still execute pinned CAS bytes cleanly via memory data URL
+    // 3. DELETE src/core/optics.ts completely -> MUST still execute pinned CAS bytes cleanly via memory data URL,
+    // including the solver-optiland-python + opt-nelder-mead combination!
     fs.unlinkSync(isolatedOpticsPath);
 
     const compAfterDelete = getComponent('solver-ts-preview', tmpWs)!;
@@ -778,6 +862,56 @@ export function applyVariableVector(s) { return s; }
     const solveAfterDelete = await runSolverComponent('solver-ts-preview', INITIAL_SINGLET_SPEC, tmpWs);
     assert.ok(solveAfterDelete.result.paraxialEflMm > 50 && solveAfterDelete.result.paraxialEflMm < 200);
 
+    // Verify solver-optiland-python + opt-nelder-mead runs extractVariables/applyVariableVector from opt-nelder-mead's CAS-pinned host module even when src/core/optics.ts is deleted!
+    const refreshedOptCtx = resolveAndAssertApproved('opt-nelder-mead', 'v0.1', tmpWs);
+    const refreshedEvalCtx = resolveAndAssertApproved('eval-rms-spot', 'v0.1', tmpWs);
+    const refreshedPySolverCtx = resolveAndAssertApproved('solver-optiland-python', 'v0.1', tmpWs);
+    assert.deepEqual(refreshedPySolverCtx.verifiedHostModules, {}); // Python solver has no TS host module
+    assert.ok(refreshedOptCtx.verifiedHostModules['src/core/optics.ts']); // Optimizer provides its own pinned host module
+
+    const optilandOptimizeOut = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
+      const harnessPath = path.resolve(process.cwd(), 'server', 'mjs_harness.mjs');
+      const proc = execFile(
+        'node',
+        ['--no-warnings', harnessPath],
+        {
+          timeout: 15000,
+          env: { ...process.env, OPENLAB_OPTILAND_BRIDGE: mockBridgePath },
+        },
+        (err, stdout, stderr) => {
+          resolve({ stdout, stderr, code: err ? 1 : 0 });
+        },
+      );
+      proc.stdin?.write(
+        JSON.stringify({
+          action: 'optimize',
+          implPath: refreshedOptCtx.implPath,
+          verifiedCode: refreshedOptCtx.verifiedCode,
+          expectedCodeHash: refreshedOptCtx.verifiedHash,
+          verifiedRelativeDeps: refreshedOptCtx.verifiedRelativeDeps,
+          verifiedHostModules: refreshedOptCtx.verifiedHostModules,
+          solverVerifiedHostModules: refreshedPySolverCtx.verifiedHostModules,
+          evalImplPath: refreshedEvalCtx.implPath,
+          evalVerifiedCode: refreshedEvalCtx.verifiedCode,
+          expectedEvalCodeHash: refreshedEvalCtx.verifiedHash,
+          evalVerifiedRelativeDeps: refreshedEvalCtx.verifiedRelativeDeps,
+          evalVerifiedHostModules: refreshedEvalCtx.verifiedHostModules,
+          params: { maxIterations: 6, simplexScaleMm: 4 },
+          evalParams: refreshedEvalCtx.ver.params,
+          solverId: 'solver-optiland-python',
+          initialSpec: INITIAL_SINGLET_SPEC,
+        }),
+      );
+      proc.stdin?.end();
+    });
+    assert.equal(optilandOptimizeOut.code, 0, optilandOptimizeOut.stderr);
+    const optilandParsed = JSON.parse(optilandOptimizeOut.stdout);
+    assert.ok(optilandParsed.history.length >= 2);
+    assert.notEqual(
+      optilandParsed.bestSpec.surfaces[0].radiusMm,
+      INITIAL_SINGLET_SPEC.surfaces[0].radiusMm,
+    );
+
     // 4. Corrupt host CAS blob -> MUST explicitly block execution (never mask CAS corruption)
     fs.writeFileSync(hostCasBlobPath, sabotagedOpticsCode, 'utf8');
     const compCasCorrupt = getComponent('solver-ts-preview', tmpWs)!;
@@ -791,7 +925,8 @@ export function applyVariableVector(s) { return s; }
       /CAS 不可变存储完整性校验失败/,
     );
 
-    // 5. Delete host CAS blob while src/core/optics.ts is ALSO deleted or modified -> MUST explicitly block execution
+    // 5. Delete host CAS blob:
+    // 5a. If disk copy is ALSO deleted or modified -> MUST explicitly block execution
     fs.unlinkSync(hostCasBlobPath);
     await assert.rejects(
       () => runComponentSelfCheck('solver-ts-preview', 'v0.1', tmpWs),
@@ -804,8 +939,15 @@ export function applyVariableVector(s) { return s; }
       /明确阻断执行|在 CAS 与工作区均不可用/,
     );
 
-    // 6. Draft approved with pinnedHostModules MUST block execution if src/core/optics.ts is subsequently modified
+    // 5b. If host CAS blob is missing (deleted) BUT disk copy strictly matches pinned codeHash -> allowed fallback with executedFromCas=false
     fs.writeFileSync(isolatedOpticsPath, originalOpticsCode, 'utf8');
+    const fallbackHostCtx = resolveAndAssertApproved('solver-ts-preview', 'v0.1', tmpWs);
+    assert.equal(fallbackHostCtx.executedFromCas, false);
+    assert.equal(fallbackHostCtx.verifiedHostModules['src/core/optics.ts'].codeHash, originalOpticsHash);
+    const solveViaDiskFallback = await runSolverComponent('solver-ts-preview', INITIAL_SINGLET_SPEC, tmpWs);
+    assert.ok(solveViaDiskFallback.result.paraxialEflMm > 50 && solveViaDiskFallback.result.paraxialEflMm < 200);
+
+    // 6. Draft approved with pinnedHostModules MUST block execution if src/core/optics.ts is subsequently modified
     const stubCode = fs.readFileSync(
       path.join(getWorkspacePaths(tmpWs).componentsDir, 'solver-ts-preview', 'v0.1', 'impl.mjs'),
       'utf8',

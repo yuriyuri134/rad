@@ -1134,14 +1134,16 @@ const SEED_COMPONENTS: SeedDef[] = [
       outputs: [
         { name: 'optimized', type: '{ bestSpec, bestTrace, bestEval, history }', description: '最优结构、产物及迭代历史' },
       ],
-      dependencies: [],
+      dependencies: [
+        { kind: 'module', targetId: 'src/core/optics.ts', reason: '优化变量提取与回写宿主模块 (extractVariables / applyVariableVector)' },
+      ],
       compatibility: ['任意 optical_solver 组件', '任意返回数值 lossScore 的 evaluator 组件'],
       assumptions: ['目标函数在初始点附近局部单调可降'],
       limits: ['高耦合多片镜头斜谷区域容易提前停止。'],
       editableParts: ['步长衰减系数', '最大迭代步数', '搜索顺序'],
       parameters: [
         { key: 'maxIterations', label: '最大迭代步数', type: 'number', defaultValue: 18, min: 4, max: 40, step: 2, unit: 'steps', description: '搜索循环上限' },
-        { key: 'initialStepMm', label: '初始步长', type: 'number', defaultValue: 6.0, min: 0.5, max: 20, step: 0.5, unit: 'mm', description: '初始曲率试探步长' },
+        { key: 'initialStepMm', label: '初始步长', type: 'number', defaultValue: 6, min: 0.5, max: 20, step: 0.5, unit: 'mm', description: '初始曲率试探步长' },
       ],
       selfCheck: {
         status: 'passed',
@@ -1184,7 +1186,9 @@ const SEED_COMPONENTS: SeedDef[] = [
       outputs: [
         { name: 'optimized', type: '{ bestSpec, bestTrace, bestEval, history }', description: '优化后结构与每轮收敛指标' },
       ],
-      dependencies: [],
+      dependencies: [
+        { kind: 'module', targetId: 'src/core/optics.ts', reason: '优化变量提取与回写宿主模块 (extractVariables / applyVariableVector)' },
+      ],
       compatibility: ['任意 optical_solver 组件', '任意 evaluator 组件'],
       assumptions: ['默认反射=1.0, 扩展=2.0, 收缩=0.5'],
       limits: ['变量较多时（>6维）单纯形退化概率上升。'],

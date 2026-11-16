@@ -252,16 +252,6 @@ export function resolveAndAssertApproved(
           `CAS 不可变存储哈希冲突：${dossier.id}@${ver.version} 预期 ${ver.codeHash}，CAS 实际 ${casHash}`,
         );
       }
-      if (depsCasMissing) {
-        throw new Error(
-          `CAS 不可变存储缺失相对依赖：${dossier.id}@${ver.version} 部分相对依赖 CAS 对象已被删除，请先核验并修复 CAS 归档`,
-        );
-      }
-      if (hostCasMissing) {
-        throw new Error(
-          `CAS 不可变存储缺失宿主模块：${dossier.id}@${ver.version} 部分宿主模块 CAS 对象已被删除，请先核验并修复 CAS 归档`,
-        );
-      }
 
       const isActive = versionTag === dossier.activeVersion;
       const review = dossier.codeSecurityReview;
@@ -285,7 +275,7 @@ export function resolveAndAssertApproved(
         verifiedHash: casHash,
         verifiedRelativeDeps,
         verifiedHostModules,
-        executedFromCas: true,
+        executedFromCas: !depsCasMissing && !hostCasMissing,
         frozenWorkspaceModified: Boolean(ver.frozenWorkspaceModified),
       };
     }

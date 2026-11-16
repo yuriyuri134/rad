@@ -25,7 +25,13 @@
       "description": "优化后结构与每轮收敛指标"
     }
   ],
-  "dependencies": [],
+  "dependencies": [
+    {
+      "kind": "module",
+      "targetId": "src/core/optics.ts",
+      "reason": "优化变量提取与回写宿主模块 (extractVariables / applyVariableVector)"
+    }
+  ],
   "compatibility": [
     "任意 optical_solver 组件",
     "任意 evaluator 组件"
@@ -110,7 +116,15 @@
         "snap-002-before"
       ],
       "sourceAvailability": "available_on_disk",
-      "immutableBlobHash": "5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a"
+      "immutableBlobHash": "5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a",
+      "pinnedHostModules": [
+        {
+          "targetId": "src/core/optics.ts",
+          "codeHash": "1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51",
+          "immutableBlobHash": "1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51",
+          "casPath": "immutable_store/sha256/1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51"
+        }
+      ]
     }
   ]
 }

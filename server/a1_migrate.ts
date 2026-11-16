@@ -1099,7 +1099,7 @@ export function migrateWorkspaceToStageA1(
         }
       }
 
-      return {
+      const cleanedVer: ComponentVersionRecord = {
         ...v,
         lifecycle,
         frozenAt: lifecycle === 'frozen' ? v.frozenAt || earliestRefAtMap.get(key) || v.createdAt : null,
@@ -1111,6 +1111,14 @@ export function migrateWorkspaceToStageA1(
         ...(pinnedHostModules && pinnedHostModules.length > 0 ? { pinnedHostModules } : {}),
         ...(driftedList.length > 0 ? { historicalDriftedHashes: driftedList } : {}),
       };
+      delete cleanedVer.casIntegrityStatus;
+      delete cleanedVer.casTamperDetected;
+      delete cleanedVer.casAvailable;
+      delete cleanedVer.workspaceMatchesFrozenHash;
+      delete cleanedVer.frozenWorkspaceModified;
+      delete cleanedVer.relativeDepsWorkspaceModified;
+      delete cleanedVer.hostModulesWorkspaceModified;
+      return cleanedVer;
     });
 
     const cleaned: ComponentDossier = {
@@ -1119,6 +1127,7 @@ export function migrateWorkspaceToStageA1(
     };
     delete cleaned.diskTamperDetected;
     delete cleaned.frozenDriftDetected;
+    delete cleaned.hostModuleDriftDetected;
     delete cleaned.casTamperDetected;
     delete cleaned.diskActualHash;
     delete cleaned.impactScope;

@@ -25,7 +25,13 @@
       "description": "最优结构、产物及迭代历史"
     }
   ],
-  "dependencies": [],
+  "dependencies": [
+    {
+      "kind": "module",
+      "targetId": "src/core/optics.ts",
+      "reason": "优化变量提取与回写宿主模块 (extractVariables / applyVariableVector)"
+    }
+  ],
   "compatibility": [
     "任意 optical_solver 组件",
     "任意返回数值 lossScore 的 evaluator 组件"
