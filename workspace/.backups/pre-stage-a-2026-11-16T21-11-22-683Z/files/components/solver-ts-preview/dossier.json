@@ -1,0 +1,81 @@
+{
+  "id": "solver-ts-preview",
+  "name": "受限几何光学预览求解器 (TS 预览用)",
+  "kind": "optical_solver",
+  "runtime": "builtin_ts_preview",
+  "summary": "纯 TypeScript 实现的旋转对称球面 3D 斯涅尔追迹器，定位为云端预览与快速教学辅助，不可替代 Optiland。",
+  "purpose": "在没有 Python 3.11+ / Optiland 的云端预览环境里，用真实物理公式支撑实验修改、重评与对比链路的真实验证。",
+  "capabilityBoundary": "仅支持旋转对称球面/平面与 5 种 Schott 玻璃；不支持非球面、倾斜偏心、真实光学系统公差或波前 FFT MTF。",
+  "inputs": [
+    {
+      "name": "systemSpec",
+      "type": "OpticalSystemSpec",
+      "unit": "mm / nm",
+      "description": "光学表面序列与目标焦距"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "rawArtifacts",
+      "type": "RayTraceResult",
+      "unit": "mm / μm",
+      "description": "含点列图、子午光线、F-C 色差与几何 OTF 近似的原始产物"
+    }
+  ],
+  "dependencies": [
+    {
+      "kind": "module",
+      "targetId": "src/core/optics.ts",
+      "reason": "底层斯涅尔与 Sellmeier 计算模块"
+    }
+  ],
+  "compatibility": [
+    "评价组件 (eval-rms-spot, eval-mtf-chromatic)",
+    "优化组件 (opt-coordinate-refine, opt-nelder-mead)"
+  ],
+  "assumptions": [
+    "空气折射率固定为 1.000277",
+    "MTF 为光线横向像差相位和乘以圆形衍射包络近似"
+  ],
+  "limits": [
+    "未经过与 Zemax/Optiland 完整非球面或大视场系统的交叉校验，仅供预览与基线对比。"
+  ],
+  "editableParts": [
+    "src/core/optics.ts",
+    "impl.mjs 自检入口"
+  ],
+  "parameters": [],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T18:47:22.761Z",
+    "checkedCodeHash": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52",
+    "summary": "薄透镜 EFL 与 N-BK7 折射率单元测试已通过 (src/core/optics.test.ts)"
+  },
+  "scientificValidation": {
+    "status": "limited_preview",
+    "basis": "已通过薄透镜公式、Schott N-BK7 d 线折射率及双胶合消色差定性单元测试；定位为有限范围预览引擎。",
+    "caveats": [
+      "不可用于高精度商业镜头定型设计，本地正式求解请切换 solver-optiland-python。"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "builtin_reviewed",
+    "approvedHash": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52",
+    "reviewedBy": "system",
+    "reviewedAt": "2026-11-16T18:47:22.761Z",
+    "executionModelNote": "内置 TypeScript 模块；修改后由 tsc 与 node:test 校验。"
+  },
+  "activeVersion": "v0.1",
+  "versions": [
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T18:47:22.788Z",
+      "parentVersion": null,
+      "author": "system",
+      "changeSummary": "初始基线实现与契约档案",
+      "codeHash": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52",
+      "params": {},
+      "codeFile": "impl.mjs"
+    }
+  ]
+}

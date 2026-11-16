@@ -1,0 +1,6 @@
+{
+  "name": "OpenLab Bench — 可拆解科学与光学探索工作台",
+  "description": "面向自由修改与组件自描述的开放科学与工程实验工作台：真实斯涅尔光学追迹、可插拔评价/优化组件档案、实验谱系对比与 FITS 二进制观测解析。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

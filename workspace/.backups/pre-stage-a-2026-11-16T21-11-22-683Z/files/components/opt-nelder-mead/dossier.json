@@ -1,0 +1,105 @@
+{
+  "id": "opt-nelder-mead",
+  "name": "Nelder-Mead 单纯形优化器",
+  "kind": "optimizer",
+  "runtime": "local_process_mjs",
+  "summary": "通过多面体反射/扩展/收缩协同调整多个表面曲率，适于耦合谷地搜索。",
+  "purpose": "作为可替换优化算法，在保持结构与评价器不变的条件下对比搜索路径与收敛效率。",
+  "capabilityBoundary": "支持多维连续参数协同寻优，不支持离散玻璃替换。",
+  "inputs": [
+    {
+      "name": "initialSpec",
+      "type": "OpticalSystemSpec",
+      "description": "初始光学结构"
+    },
+    {
+      "name": "helpers",
+      "type": "Trace + Evaluate",
+      "description": "求解器与评价器句柄"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "optimized",
+      "type": "{ bestSpec, bestTrace, bestEval, history }",
+      "description": "优化后结构与每轮收敛指标"
+    }
+  ],
+  "dependencies": [],
+  "compatibility": [
+    "任意 optical_solver 组件",
+    "任意 evaluator 组件"
+  ],
+  "assumptions": [
+    "默认反射=1.0, 扩展=2.0, 收缩=0.5"
+  ],
+  "limits": [
+    "变量较多时（>6维）单纯形退化概率上升。"
+  ],
+  "editableParts": [
+    "单纯形缩放参数",
+    "最大迭代次数",
+    "退化重启策略"
+  ],
+  "parameters": [
+    {
+      "key": "maxIterations",
+      "label": "最大迭代步数",
+      "type": "number",
+      "defaultValue": 24,
+      "min": 5,
+      "max": 45,
+      "step": 2,
+      "unit": "steps",
+      "description": "单纯形更新轮数"
+    },
+    {
+      "key": "simplexScaleMm",
+      "label": "初始单纯形尺度",
+      "type": "number",
+      "defaultValue": 5.5,
+      "min": 1,
+      "max": 20,
+      "step": 0.5,
+      "unit": "mm",
+      "description": "各维度初始步长"
+    }
+  ],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T18:47:22.762Z",
+    "checkedCodeHash": "5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a",
+    "summary": "已通过二维耦合抛物面收敛自检"
+  },
+  "scientificValidation": {
+    "status": "limited_preview",
+    "basis": "经典 Nelder-Mead 启发式算法，适合中低维无导数目标，不能替代 Optiland 解析雅可比阻尼最小二乘法。",
+    "caveats": [
+      "受初始单纯形尺度影响"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "builtin_reviewed",
+    "approvedHash": "5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a",
+    "reviewedBy": "system",
+    "reviewedAt": "2026-11-16T18:47:22.762Z",
+    "executionModelNote": "通过 child_process.execFile 在独立 Node 子进程执行；非 OS 安全沙箱，修改代码后须重新人工确认哈希。"
+  },
+  "activeVersion": "v0.1",
+  "versions": [
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T15:27:31.243Z",
+      "parentVersion": null,
+      "author": "system",
+      "changeSummary": "初始基线实现与契约档案",
+      "codeHash": "5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a",
+      "approvedForExecution": true,
+      "params": {
+        "maxIterations": 24,
+        "simplexScaleMm": 5.5
+      },
+      "codeFile": "impl.mjs"
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "id": "eval-rms-spot",
+  "name": "单色/均方根光斑评价器",
+  "kind": "evaluator",
+  "runtime": "local_process_mjs",
+  "summary": "以多波段平均 RMS 光斑半径与焦距误差作为好坏判据；若缺失必要产物则拒绝推测。",
+  "purpose": "检验单目标光斑评价标准下的优化倾向，并用于与更严格的色差/MTF 评价标准形成对照。",
+  "capabilityBoundary": "可对任意已保存 rawArtifacts 执行非破坏性事后评价；不负责修改镜头几何或运行追迹。",
+  "inputs": [
+    {
+      "name": "rawArtifacts",
+      "type": "RayTraceResult",
+      "description": "已保存的实验原始计算产物"
+    },
+    {
+      "name": "spec",
+      "type": "OpticalSystemSpec",
+      "description": "包含 targetEflMm 目标焦距"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "verdict",
+      "type": "EvaluationVerdict",
+      "description": "pass/warning/fail/insufficient_artifacts 判定与分项指标"
+    }
+  ],
+  "dependencies": [],
+  "compatibility": [
+    "任意产出 rmsSpotRadiusUm 与 paraxialEflMm 的光学求解器"
+  ],
+  "assumptions": [
+    "默认所有波段光斑半径同等权重"
+  ],
+  "limits": [
+    "忽略轴向色差焦点漂移，宽光谱下容易给出乐观误判。"
+  ],
+  "editableParts": [
+    "损失权重公式",
+    "maxRmsUm 阈值",
+    "eflToleranceMm 容差",
+    "selfCheck 自检逻辑"
+  ],
+  "parameters": [
+    {
+      "key": "maxRmsUm",
+      "label": "RMS 光斑上限",
+      "type": "number",
+      "defaultValue": 65,
+      "min": 5,
+      "max": 300,
+      "step": 5,
+      "unit": "μm",
+      "description": "允许的最大 RMS 光斑半径"
+    },
+    {
+      "key": "eflToleranceMm",
+      "label": "焦距容差",
+      "type": "number",
+      "defaultValue": 3,
+      "min": 0.2,
+      "max": 20,
+      "step": 0.2,
+      "unit": "mm",
+      "description": "EFL 允许偏差"
+    }
+  ],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T21:11:12.136Z",
+    "checkedCodeHash": "0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b",
+    "summary": "自检通过：正常样本判定 pass，缺失产物拒绝推测 (insufficient_artifacts)"
+  },
+  "scientificValidation": {
+    "status": "limited_preview",
+    "basis": "几何 RMS 光斑半径判据属行业常见初筛指标，但不包含波前衍射效应。",
+    "caveats": [
+      "对色差与高空间频率对比度不敏感"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "builtin_reviewed",
+    "approvedHash": "0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b",
+    "reviewedBy": "test-reviewer",
+    "reviewedAt": "2026-11-16T21:11:10.956Z",
+    "executionModelNote": "通过 child_process.execFile 在独立 Node 子进程执行；非 OS 安全沙箱，Rad 自己修改代码须核对 SHA-256 哈希后授权。"
+  },
+  "activeVersion": "v0.1",
+  "versions": [
+    {
+      "version": "v0.2",
+      "createdAt": "2026-11-16T15:29:04.225Z",
+      "parentVersion": "v0.1",
+      "author": "rad",
+      "changeSummary": "浏览器实测：将 RMS 上限收紧到 40 μm",
+      "codeHash": "a3b03826e7ce6dccbaac59ab5eb8f46b479bbd41b3ce7a3817f66939ce062b55",
+      "approvedForExecution": true,
+      "params": {
+        "maxRmsUm": 40,
+        "eflToleranceMm": 3
+      },
+      "codeFile": "impl.mjs"
+    },
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T15:27:31.243Z",
+      "parentVersion": null,
+      "author": "system",
+      "changeSummary": "初始基线实现与契约档案",
+      "codeHash": "0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b",
+      "approvedForExecution": true,
+      "params": {
+        "maxRmsUm": 65,
+        "eflToleranceMm": 3
+      },
+      "codeFile": "impl.mjs"
+    }
+  ]
+}

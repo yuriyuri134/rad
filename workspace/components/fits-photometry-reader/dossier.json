@@ -1,0 +1,77 @@
+{
+  "id": "fits-photometry-reader",
+  "name": "FITS 二进制解析与孔径测光组件（阶段二预留）",
+  "kind": "fits_analyzer",
+  "runtime": "builtin_ts_preview",
+  "activeVersion": "v0.1",
+  "summary": "解析标准 2880-byte FITS Header 与 IEEE 大端序像素；当前阶段一主界面暂不展开，底层单元测试保持常绿。",
+  "purpose": "为未来阶段二接入天文观测数据分析保留真实已测的底层二进制解析能力。",
+  "capabilityBoundary": "支持主 HDU 2D 图像（BITPIX 8/16/32/-32/-64）；暂不支持多扩展 HDU 与 WCS 天球投影。",
+  "inputs": [
+    {
+      "name": "buffer",
+      "type": "Uint8Array",
+      "unit": "bytes",
+      "description": "IAU FITS 原始字节流"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "analysis",
+      "type": "FitsAnalysisResult",
+      "description": "Header 卡片与孔径测光结果"
+    }
+  ],
+  "dependencies": [
+    {
+      "kind": "module",
+      "targetId": "src/core/fits.ts",
+      "reason": "纯 TS FITS 解析模块"
+    }
+  ],
+  "compatibility": [
+    "阶段二天文观测实验模块"
+  ],
+  "assumptions": [
+    "单文件 2D 主 HDU"
+  ],
+  "limits": [
+    "阶段一聚焦光学设计与可重构工作台机制，该组件界面入口暂隐藏。"
+  ],
+  "editableParts": [
+    "src/core/fits.ts"
+  ],
+  "parameters": [],
+  "versions": [
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T18:47:38.422Z",
+      "parentVersion": null,
+      "author": "system",
+      "changeSummary": "阶段二预留基线（单元测试通过）",
+      "codeHash": "c3f2aa7773644dba11929048641c3b1bc758edb202c3ee10d93c5a22fc81eb97",
+      "params": {},
+      "codeFile": "readme.txt"
+    }
+  ],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T18:47:38.423Z",
+    "checkedCodeHash": "c3f2aa7773644dba11929048641c3b1bc758edb202c3ee10d93c5a22fc81eb97",
+    "summary": "src/core/fits.test.ts 2/2 单元测试通过"
+  },
+  "scientificValidation": {
+    "status": "limited_preview",
+    "basis": "标准 FITS 2880-byte 块解析已测，暂未对复杂真实巡天多扩展文件测试。",
+    "caveats": [
+      "阶段二再扩展界面"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "builtin_reviewed",
+    "approvedHash": "c3f2aa7773644dba11929048641c3b1bc758edb202c3ee10d93c5a22fc81eb97",
+    "reviewedBy": "system",
+    "reviewedAt": "2026-11-16T18:47:38.423Z",
+    "executionModelNote": "纯只读二进制解析模块"
+  }
+}

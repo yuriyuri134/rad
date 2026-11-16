@@ -1,0 +1,116 @@
+{
+  "id": "eval-mtf-chromatic",
+  "name": "MTF30 与消色差严格评价器",
+  "kind": "evaluator",
+  "runtime": "local_process_mjs",
+  "summary": "同时约束 30 lp/mm MTF 对比度与 F-C 轴向色差漂移，暴露单透镜盲区。",
+  "purpose": "在不推翻原始光线追迹证据的前提下，用更严格的成像质量标准重新审视历史设计。",
+  "capabilityBoundary": "可对历史产物重评，也可以作为优化器的实时损失函数；若产物缺少 mtf30LpMm 或色差字段则拒评。",
+  "inputs": [
+    {
+      "name": "rawArtifacts",
+      "type": "RayTraceResult",
+      "description": "需包含 mtf30LpMm 与 axialChromaticShiftMm"
+    },
+    {
+      "name": "spec",
+      "type": "OpticalSystemSpec",
+      "description": "目标焦距规格"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "verdict",
+      "type": "EvaluationVerdict",
+      "description": "严格多指标核查结论"
+    }
+  ],
+  "dependencies": [],
+  "compatibility": [
+    "产出 MTF 与多波段色差指标的光学求解器"
+  ],
+  "assumptions": [
+    "默认 30 lp/mm 作为中等空间频率基准"
+  ],
+  "limits": [
+    "单透镜通常无法同时满足 0.45mm 色差上限。"
+  ],
+  "editableParts": [
+    "minMtf30 阈值",
+    "maxChromaticMm 阈值",
+    "lossScore 权重公式"
+  ],
+  "parameters": [
+    {
+      "key": "minMtf30",
+      "label": "MTF@30lp 最低要求",
+      "type": "number",
+      "defaultValue": 0.35,
+      "min": 0.05,
+      "max": 0.9,
+      "step": 0.05,
+      "unit": "",
+      "description": "30 lp/mm 最低 MTF"
+    },
+    {
+      "key": "maxChromaticMm",
+      "label": "F-C 色差上限",
+      "type": "number",
+      "defaultValue": 0.45,
+      "min": 0.05,
+      "max": 3,
+      "step": 0.05,
+      "unit": "mm",
+      "description": "486/656nm 轴向焦移上限"
+    },
+    {
+      "key": "eflToleranceMm",
+      "label": "焦距容差",
+      "type": "number",
+      "defaultValue": 2.5,
+      "min": 0.2,
+      "max": 15,
+      "step": 0.2,
+      "unit": "mm",
+      "description": "EFL 允许偏差"
+    }
+  ],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T18:47:22.761Z",
+    "checkedCodeHash": "d6da83ab37f142a720ab210574dec9f9607e08c5f8642557c4b46b73c0bbbc00",
+    "summary": "已通过高色差样本拒绝与消色差样本通过自检"
+  },
+  "scientificValidation": {
+    "status": "limited_preview",
+    "basis": "结合多波段焦点漂移与 MTF 判据；实际工程阈值需依据具体传感器像元尺寸标定。",
+    "caveats": [
+      "仅检验 0° 轴上视场 MTF"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "builtin_reviewed",
+    "approvedHash": "d6da83ab37f142a720ab210574dec9f9607e08c5f8642557c4b46b73c0bbbc00",
+    "reviewedBy": "system",
+    "reviewedAt": "2026-11-16T18:47:22.761Z",
+    "executionModelNote": "通过 child_process.execFile 在独立 Node 子进程执行；非 OS 安全沙箱，修改代码后须重新人工确认哈希。"
+  },
+  "activeVersion": "v0.1",
+  "versions": [
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T15:27:31.243Z",
+      "parentVersion": null,
+      "author": "system",
+      "changeSummary": "初始基线实现与契约档案",
+      "codeHash": "d6da83ab37f142a720ab210574dec9f9607e08c5f8642557c4b46b73c0bbbc00",
+      "approvedForExecution": true,
+      "params": {
+        "minMtf30": 0.35,
+        "maxChromaticMm": 0.45,
+        "eflToleranceMm": 2.5
+      },
+      "codeFile": "impl.mjs"
+    }
+  ]
+}

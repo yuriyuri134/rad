@@ -1,0 +1,113 @@
+{
+  "backupId": "pre-stage-a-2026-11-16T21-11-22-683Z",
+  "createdAt": "2026-11-16T21:11:22.685Z",
+  "hashAlgorithm": "SHA-256 (256-bit digest, 64 hex chars)",
+  "excludedPrefixes": [
+    ".backups",
+    ".*"
+  ],
+  "totalFiles": 20,
+  "totalBytes": 167487,
+  "files": [
+    {
+      "relativePath": "components/analysis-aberration-summary/dossier.json",
+      "bytes": 3263,
+      "sha256": "d4fefe31732e6ab23a38289858bb708e7263c759768e3821792c6977d565ed4f"
+    },
+    {
+      "relativePath": "components/analysis-aberration-summary/v0.1/impl.mjs",
+      "bytes": 2485,
+      "sha256": "cd2ebd44bea79fbfe686a44281294f6a36212c4fbc7c095fce3c8f92ccb18383"
+    },
+    {
+      "relativePath": "components/arch-map-engine/dossier.json",
+      "bytes": 3407,
+      "sha256": "24ca1ce7ced7bfccbcdd0902fa0e0fd0282cc45fc7301fe711c450717efe7e6a"
+    },
+    {
+      "relativePath": "components/arch-map-engine/v0.1/impl.mjs",
+      "bytes": 1057,
+      "sha256": "c88b0eb8f22225eb579c8e74e3a08439015a38ada10b03cee12c74f8de4906d8"
+    },
+    {
+      "relativePath": "components/eval-mtf-chromatic/dossier.json",
+      "bytes": 3495,
+      "sha256": "abb077508e96419ddabf1d28faa21b1f15409b14aaa2383d8b496212c3ac857d"
+    },
+    {
+      "relativePath": "components/eval-mtf-chromatic/v0.1/impl.mjs",
+      "bytes": 3679,
+      "sha256": "d6da83ab37f142a720ab210574dec9f9607e08c5f8642557c4b46b73c0bbbc00"
+    },
+    {
+      "relativePath": "components/eval-rms-spot/dossier.json",
+      "bytes": 3790,
+      "sha256": "7da24ba48c6d8a82dccd39acf7b175ec116f351d447fcdc39b67373455e67e6c"
+    },
+    {
+      "relativePath": "components/eval-rms-spot/v0.1/impl.mjs",
+      "bytes": 3062,
+      "sha256": "0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b"
+    },
+    {
+      "relativePath": "components/fits-photometry-reader/dossier.json",
+      "bytes": 2478,
+      "sha256": "7d565da6481e6e078af7f65c64880bf0a10ee7a7b21261acd5c4a8b6a7b58a81"
+    },
+    {
+      "relativePath": "components/fits-photometry-reader/v0.1/readme.txt",
+      "bytes": 168,
+      "sha256": "c3f2aa7773644dba11929048641c3b1bc758edb202c3ee10d93c5a22fc81eb97"
+    },
+    {
+      "relativePath": "components/opt-coordinate-refine/dossier.json",
+      "bytes": 3291,
+      "sha256": "6bf127f203fc9e1433f776cb5ee0ce4534d175e7c9b553c549454a304c88cb03"
+    },
+    {
+      "relativePath": "components/opt-coordinate-refine/v0.1/impl.mjs",
+      "bytes": 3178,
+      "sha256": "cbc88d33eed5ab847051b4bb5c8a5c7a1418b77640f11939f537aea6fce2eca4"
+    },
+    {
+      "relativePath": "components/opt-nelder-mead/dossier.json",
+      "bytes": 3189,
+      "sha256": "9a48a43592d8ac3fcbca2f9d4a2a83f222ce32b43aec87609dc687531d6fd162"
+    },
+    {
+      "relativePath": "components/opt-nelder-mead/v0.1/impl.mjs",
+      "bytes": 4078,
+      "sha256": "5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a"
+    },
+    {
+      "relativePath": "components/solver-optiland-python/dossier.json",
+      "bytes": 3780,
+      "sha256": "7923368db6dba58472533f3c39e8d47394a939295fed8bbda8bb250689e3d548"
+    },
+    {
+      "relativePath": "components/solver-optiland-python/v0.1/impl.py",
+      "bytes": 496,
+      "sha256": "15a4ce1a973048d9446cfbe68637db61e6ea60c6dd29a63e5f6385e7a38b749a"
+    },
+    {
+      "relativePath": "components/solver-ts-preview/dossier.json",
+      "bytes": 3038,
+      "sha256": "fb03cfbfec1b13c1483c3c8a32343472445f93c1177529147d0413115f3816d3"
+    },
+    {
+      "relativePath": "components/solver-ts-preview/v0.1/impl.mjs",
+      "bytes": 1030,
+      "sha256": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52"
+    },
+    {
+      "relativePath": "runs.jsonl",
+      "bytes": 115246,
+      "sha256": "698ff3e99c846a050abb559620c3602f4e8af65bcd3e4688739b031e9e35b42d"
+    },
+    {
+      "relativePath": "thread.jsonl",
+      "bytes": 3277,
+      "sha256": "cc80ac9f02d4eededf18970bbf475d8efefce019e945ff31c082e09e60e6439a"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "id": "analysis-aberration-summary",
+  "name": "球差/色差主导诊断插件 (独立可扩展组件)",
+  "kind": "analysis_plugin",
+  "runtime": "local_process_mjs",
+  "activeVersion": "v0.1",
+  "summary": "不修改主框架源码、直接放入 workspace/components/ 的独立诊断插件：估算 Airy 衍射极限并比较球差与色差主导性。",
+  "purpose": "验证 Rad 可以在不改核心框架代码的前提下，通过新增目录与 dossier.json 扩展全新分析能力。",
+  "capabilityBoundary": "仅消费已保存 rawArtifacts 的几何统计量与 F 数，不重跑光线追迹；缺少必要字段时返回 insufficient_artifacts。",
+  "inputs": [
+    {
+      "name": "rawArtifacts",
+      "type": "RayTraceResult",
+      "description": "包含 rmsSpotRadiusUm, axialChromaticShiftMm, longitudinalSphericalAberrationMm, fNumber"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "aberrationReport",
+      "type": "Object",
+      "description": "Airy 半径估算、衍射倍数与主导像差判断"
+    }
+  ],
+  "dependencies": [
+    {
+      "kind": "component",
+      "targetId": "solver-ts-preview",
+      "reason": "消费光学求解器产出的原始像差统计量（也兼容 Optiland）"
+    }
+  ],
+  "compatibility": [
+    "所有产出几何像差统计量的光学求解器"
+  ],
+  "assumptions": [
+    "采用单色参考波长 587.56 nm 估算理想 Airy 盘半径 (1.22 λ F/#)"
+  ],
+  "limits": [
+    "未考虑渐晕或中心遮拦对 Airy 盘的影响"
+  ],
+  "editableParts": [
+    "referenceWavelengthUm 参数",
+    "dominantAberration 判别阈值"
+  ],
+  "parameters": [
+    {
+      "key": "referenceWavelengthUm",
+      "label": "Airy 参考波长",
+      "type": "number",
+      "defaultValue": 0.58756,
+      "min": 0.4,
+      "max": 1,
+      "step": 0.01,
+      "unit": "μm",
+      "description": "用于计算衍射极限 1.22 λ F/#"
+    }
+  ],
+  "versions": [
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T18:51:09.644Z",
+      "parentVersion": null,
+      "author": "rad",
+      "changeSummary": "阶段 5 扩展性验证：独立新增像差诊断插件",
+      "codeHash": "cd2ebd44bea79fbfe686a44281294f6a36212c4fbc7c095fce3c8f92ccb18383",
+      "params": {
+        "referenceWavelengthUm": 0.58756
+      },
+      "codeFile": "impl.mjs"
+    }
+  ],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T18:54:49.326Z",
+    "checkedCodeHash": "cd2ebd44bea79fbfe686a44281294f6a36212c4fbc7c095fce3c8f92ccb18383",
+    "summary": "自检通过：F/4 Airy 半径=2.867 μm，且缺失字段正确返回 insufficient_artifacts"
+  },
+  "scientificValidation": {
+    "status": "limited_preview",
+    "basis": "Airy 盘 1.22 λ F/# 为标准圆形孔径衍射公式；主导像差比值为经验启发式指标。",
+    "caveats": [
+      "启发式比值阈值供探索参考"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "user_approved_hash",
+    "approvedHash": "cd2ebd44bea79fbfe686a44281294f6a36212c4fbc7c095fce3c8f92ccb18383",
+    "reviewedBy": "rad",
+    "reviewedAt": "2026-11-16T18:51:09.644Z",
+    "executionModelNote": "通过 child_process.execFile 在独立 Node 子进程执行；非 OS 安全沙箱，修改源码后须重新核对 SHA-256 哈希。"
+  }
+}

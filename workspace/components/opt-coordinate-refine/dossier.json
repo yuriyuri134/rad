@@ -1,0 +1,105 @@
+{
+  "id": "opt-coordinate-refine",
+  "name": "自适应坐标模式搜索优化器",
+  "kind": "optimizer",
+  "runtime": "local_process_mjs",
+  "summary": "逐维探测曲率/厚度变量，未改善时步长乘以 0.55 收敛。",
+  "purpose": "提供一个透明、可控的基准局部搜索策略，供 Rad 修改步长规则或与单纯形法对照。",
+  "capabilityBoundary": "无梯度局部寻优；适合配合任意外部评价器与求解器，不保证全局最优。",
+  "inputs": [
+    {
+      "name": "initialSpec",
+      "type": "OpticalSystemSpec",
+      "description": "带可变标记的初始光学结构"
+    },
+    {
+      "name": "helpers",
+      "type": "Trace + Evaluate",
+      "description": "由组合层注入的求解器与评价器句柄"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "optimized",
+      "type": "{ bestSpec, bestTrace, bestEval, history }",
+      "description": "最优结构、产物及迭代历史"
+    }
+  ],
+  "dependencies": [],
+  "compatibility": [
+    "任意 optical_solver 组件",
+    "任意返回数值 lossScore 的 evaluator 组件"
+  ],
+  "assumptions": [
+    "目标函数在初始点附近局部单调可降"
+  ],
+  "limits": [
+    "高耦合多片镜头斜谷区域容易提前停止。"
+  ],
+  "editableParts": [
+    "步长衰减系数",
+    "最大迭代步数",
+    "搜索顺序"
+  ],
+  "parameters": [
+    {
+      "key": "maxIterations",
+      "label": "最大迭代步数",
+      "type": "number",
+      "defaultValue": 18,
+      "min": 4,
+      "max": 40,
+      "step": 2,
+      "unit": "steps",
+      "description": "搜索循环上限"
+    },
+    {
+      "key": "initialStepMm",
+      "label": "初始步长",
+      "type": "number",
+      "defaultValue": 6,
+      "min": 0.5,
+      "max": 20,
+      "step": 0.5,
+      "unit": "mm",
+      "description": "初始曲率试探步长"
+    }
+  ],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T18:47:22.761Z",
+    "checkedCodeHash": "cbc88d33eed5ab847051b4bb5c8a5c7a1418b77640f11939f537aea6fce2eca4",
+    "summary": "已通过二次测试函数单调下降自检"
+  },
+  "scientificValidation": {
+    "status": "limited_preview",
+    "basis": "标准坐标模式搜索算法，自检仅证明对简单二次测试函数有效，不证明对所有多片镜头全局收敛。",
+    "caveats": [
+      "复杂系统建议对照 opt-nelder-mead 或 Optiland LeastSquares"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "builtin_reviewed",
+    "approvedHash": "cbc88d33eed5ab847051b4bb5c8a5c7a1418b77640f11939f537aea6fce2eca4",
+    "reviewedBy": "system",
+    "reviewedAt": "2026-11-16T18:47:22.761Z",
+    "executionModelNote": "通过 child_process.execFile 在独立 Node 子进程执行；非 OS 安全沙箱，修改代码后须重新人工确认哈希。"
+  },
+  "activeVersion": "v0.1",
+  "versions": [
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T15:27:31.243Z",
+      "parentVersion": null,
+      "author": "system",
+      "changeSummary": "初始基线实现与契约档案",
+      "codeHash": "cbc88d33eed5ab847051b4bb5c8a5c7a1418b77640f11939f537aea6fce2eca4",
+      "approvedForExecution": true,
+      "params": {
+        "maxIterations": 18,
+        "initialStepMm": 6
+      },
+      "codeFile": "impl.mjs"
+    }
+  ]
+}

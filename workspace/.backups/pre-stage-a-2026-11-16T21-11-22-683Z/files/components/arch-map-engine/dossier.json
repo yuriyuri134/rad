@@ -1,0 +1,92 @@
+{
+  "id": "arch-map-engine",
+  "name": "整体架构地图引擎 (Architecture Map)",
+  "kind": "architecture_map",
+  "runtime": "builtin_engine",
+  "summary": "从真实磁盘组件、源码 import、实验账本与环境探测构建可下钻的系统结构图谱，并在图中呈现自身构造。",
+  "purpose": "让人与 AI 在不复制第二套数据的前提下，理解总体与局部构造、跨层关系、真实溯源与过期/不一致异常。",
+  "capabilityBoundary": "第一版真实扫描组件目录、源码静态 import、运行观测账本与环境状态；对于未运行的组件连接仅标注为「明确声明」而不会冒充实际调用。",
+  "inputs": [
+    {
+      "name": "workspace/components/*",
+      "type": "ComponentDossier[]",
+      "description": "磁盘组件档案与实时哈希"
+    },
+    {
+      "name": "workspace/runs.jsonl",
+      "type": "ExperimentRun[]",
+      "description": "实验运行观测账本"
+    },
+    {
+      "name": "src/ & server/ imports",
+      "type": "AST/Regex Scan",
+      "description": "真实代码模块静态依赖扫描"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ArchitectureMapData",
+      "type": "Nodes + Edges + Anomalies",
+      "description": "区分包含与跨层关系、标注来源可信度与异常列表的结构图数据"
+    }
+  ],
+  "dependencies": [
+    {
+      "kind": "module",
+      "targetId": "src/core/architectureMap.ts",
+      "reason": "采集、关系解析与一致性检查核心"
+    },
+    {
+      "kind": "module",
+      "targetId": "src/components/ArchitectureMapView.tsx",
+      "reason": "布局、下钻导航与交互渲染"
+    }
+  ],
+  "compatibility": [
+    "任何写入 workspace/components/ 的新组件都会自动被扫描并接入图谱"
+  ],
+  "assumptions": [
+    "静态 import 扫描覆盖顶层相对路径导入，暂不展开动态拼接路径"
+  ],
+  "limits": [
+    "节点在画布上的拖拽定位仅影响视图布局，不会自动修改真实系统结构。"
+  ],
+  "editableParts": [
+    "src/core/architectureMap.ts",
+    "src/components/ArchitectureMapView.tsx"
+  ],
+  "parameters": [],
+  "selfCheck": {
+    "status": "passed",
+    "checkedAt": "2026-11-16T18:47:22.762Z",
+    "checkedCodeHash": "c88b0eb8f22225eb579c8e74e3a08439015a38ada10b03cee12c74f8de4906d8",
+    "summary": "结构扫描与自引用防无限递归边界已由单元测试验证"
+  },
+  "scientificValidation": {
+    "status": "validated_reference",
+    "basis": "软件结构反射工具，每条节点与边均附带真实文件/账本出处证据。",
+    "caveats": [
+      "部分跨模块语义关系标注为 declared，需待实际运行观测升级为 observed"
+    ]
+  },
+  "codeSecurityReview": {
+    "status": "builtin_reviewed",
+    "approvedHash": "c88b0eb8f22225eb579c8e74e3a08439015a38ada10b03cee12c74f8de4906d8",
+    "reviewedBy": "system",
+    "reviewedAt": "2026-11-16T18:47:22.762Z",
+    "executionModelNote": "只读扫描本地代码与账本，不执行任意用户脚本。"
+  },
+  "activeVersion": "v0.1",
+  "versions": [
+    {
+      "version": "v0.1",
+      "createdAt": "2026-11-16T18:47:22.791Z",
+      "parentVersion": null,
+      "author": "system",
+      "changeSummary": "初始基线实现与契约档案",
+      "codeHash": "c88b0eb8f22225eb579c8e74e3a08439015a38ada10b03cee12c74f8de4906d8",
+      "params": {},
+      "codeFile": "impl.mjs"
+    }
+  ]
+}
