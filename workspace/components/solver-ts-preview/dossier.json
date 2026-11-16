@@ -88,7 +88,15 @@
         "snap-002-before"
       ],
       "sourceAvailability": "available_on_disk",
-      "immutableBlobHash": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52"
+      "immutableBlobHash": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52",
+      "pinnedHostModules": [
+        {
+          "targetId": "src/core/optics.ts",
+          "codeHash": "1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51",
+          "immutableBlobHash": "1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51",
+          "casPath": "immutable_store/sha256/1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51"
+        }
+      ]
     }
   ]
 }

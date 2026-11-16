@@ -22,11 +22,13 @@
 - **构建/冻结期相对依赖发现与固定（`server/storage.ts`）**：
   - `discoverLocalRelativeDependencies` 对组件版本目录内的 ESM 相对导入（`./*`、`../*`）进行广度优先扫描（BFS），计算每个本地相对依赖的 `codeHash` 与 `immutableBlobHash` 并固化为 `ComponentVersionRecord.pinnedRelativeDeps`；
   - **路径逃逸拦截**：任何未在组件 `dossier.dependencies` 中显式声明的 `../` 越界相对路径立即抛出 `组件相对依赖越界`；缺失文件抛出 `组件相对依赖缺失`；
-  - **宿主机核心模块白名单**：`resolveAllowedHostModuleImport` 仅放行组件档案 `dependencies` 中显式声明为 `{ kind: 'module', targetId: 'src/core/*' }` 的宿主机模块（例如 `solver-ts-preview@v0.1` 对 `../../../../src/core/optics.ts` 的引用），将其固定在 `verifiedHostModules` 中，不污染组件本地 `pinnedRelativeDeps`。
-- **无盘 TOCTOU 内存模块树编译与执行（`server/runner.ts` + `server/mjs_harness.mjs`）**：
-  - `resolveAndAssertApproved` 一次性完成主入口、全部 `pinnedRelativeDeps` 及 `verifiedHostModules` 的 SHA-256 校验，并将已校验字节直接传入子进程 `mjs_harness.mjs`；
-  - `compileVerifiedModuleTree` 自底向上将组件局部依赖树重写并内联编译为 `data:text/javascript;base64,...` ESM URL（支持 DAG 单例复用与循环依赖检测），执行期**完全不再触碰磁盘上的组件相对依赖文件**，阻断校验后至执行前的 TOCTOU 替换攻击；
-  - `resolveDeclaredHostModuleUrl` 在 harness 内对声明的 `src/core/*` 宿主机模块同样校验 SHA-256，并在子进程内阻断一切未声明的 `../` 越界加载。
+- **宿主机核心模块独立固定与 CAS 归档（`pinnedHostModules`）**：
+  - `ComponentVersionRecord.pinnedHostModules` 独立记录每个声明宿主机核心模块的 `targetId`、`codeHash`（64 位 SHA-256）、`immutableBlobHash` 与 `casPath`（`immutable_store/sha256/<hash>`）；
+  - `discoverDeclaredHostModules` 仅放行组件 `dependencies` 中显式声明为 `{ kind: 'module', targetId: 'src/core/*' }` 的模块（例如 `solver-ts-preview@v0.1` 依赖的 `src/core/optics.ts`）；冻结或历史迁移时将其完整源码字节同步写入 CAS；
+  - `hydrateDossierLiveState` 同时检测 `src/core/*` 磁盘副本漂移（`hostModulesWorkspaceModified`、`hostModuleDriftDetected`）与宿主模块 CAS 对象完整性。
+- **无盘 TOCTOU 与无 `fileUrl` 内存 `data URL` 执行（`server/runner.ts` + `server/mjs_harness.mjs`）**：
+  - `resolveAndAssertApproved` 一次性完成主入口、全部 `pinnedRelativeDeps` 及 `pinnedHostModules` 的 CAS/SHA-256 校验，并将经校验的原始字节传入子进程 `mjs_harness.mjs`；当主/宿 CAS 对象被篡改，或 CAS 与磁盘副本均缺失/不匹配时，明确阻断执行；
+  - `compileVerifiedModuleTree` 与 `compileVerifiedHostModule` 通过 Node 内置 `stripTypeScriptTypes` 与 `data:text/javascript;base64,...` 将组件局部依赖树与声明宿主模块（如 `src/core/optics.ts`）编译为内存 `data URL` 执行，**不再通过 `fileUrl` 加载宿主模块，也不在 harness 启动时静态导入磁盘 `src/core/optics.ts`**。
 
 ### 3. 迁移异常回滚与进程崩溃恢复的机制区分（A1.2.1）
 | 维度 | 迁移异常回滚（In-Process Exception Rollback） | 进程崩溃恢复（Durable Crash Recovery Journal） |
@@ -53,7 +55,7 @@
 
 | 检查项 | 执行命令 / 工具 | 结果 | 关键指标 / 输出 |
 | :--- | :--- | :--- | :--- |
-| **全量单元测试** | `node --test server/a0_audit.test.ts server/a1_models.test.ts server/a1_2_0_cas.test.ts server/a1_migrate.test.ts server/runner.test.ts src/core/*.test.ts` | **通过 (24 / 24)** | `tests 24`, `pass 24`, `fail 0`, `duration_ms 3536.698805` |
+| **全量单元测试** | `node --test server/a0_audit.test.ts server/a1_models.test.ts server/a1_2_0_cas.test.ts server/a1_migrate.test.ts server/runner.test.ts src/core/*.test.ts` | **通过 (25 / 25)** | `tests 25`, `pass 25`, `fail 0`, `duration_ms 5116.890052` |
 | **前端与服务端构建** | `compile_applet` (`vite build`) | **通过** | `Build succeeded - the applet is compiled` |
 | **TypeScript 类型检查** | `lint_applet` (`tsc --noEmit`) | **通过** | `Linting completed successfully ($ tsc --noEmit)` |
 | **真实工作区迁移与幂等性** | `migrateWorkspaceToStageA1('workspace')` 连续执行两次 | **通过** | `res1.status = "migrated"`、`res2.success = true`、两次全局状态哈希 **100% 一致**；`.migration_tmp` 无残留 |
@@ -77,13 +79,14 @@
 | `migration_a1_manifest.json` | 3,967 | `66a8f70d38490220c33d5fcacddbb06c3559cf7641245ec8ccd8bfb2bdfad0ba` |
 
 ### 2. CAS 不可变源码对象（`workspace/immutable_store/sha256/`）
-迁移共计冻结 `5` 个已引用组件版本，写入 `5` 个 CAS Blob（所有 Blob 名称均与实际内容 SHA-256 完全匹配）：
+迁移共计冻结 `5` 个已引用组件版本及 `1` 个声明宿主模块，写入 `6` 个 CAS Blob（所有 Blob 名称均与实际内容 SHA-256 完全匹配）：
 
-| CAS 对象（完整 SHA-256 文件名 / 摘要） | 字节数 | 对应组件版本 |
+| CAS 对象（完整 SHA-256 文件名 / 摘要） | 字节数 | 对应组件版本 / 宿主模块 |
 | :--- | ---: | :--- |
 | `0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b` | 3,062 | `eval-rms-spot@v0.1/impl.mjs` |
+| `1f7cc531d55753c046447a9639cebe850af42f8b881f9818b5ce6fca4df4bd51` | 19,058 | `src/core/optics.ts`（`solver-ts-preview@v0.1` `pinnedHostModules`） |
 | `5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a` | 4,078 | `opt-nelder-mead@v0.1/impl.mjs` |
-| `7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52` | 1,030 | `solver-ts-preview@v0.1/impl.mjs`（含声明宿主机模块依赖 `src/core/optics.ts`） |
+| `7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52` | 1,030 | `solver-ts-preview@v0.1/impl.mjs` |
 | `cd2ebd44bea79fbfe686a44281294f6a36212c4fbc7c095fce3c8f92ccb18383` | 2,485 | `analysis-aberration-summary@v0.1/impl.mjs` |
 | `d6da83ab37f142a720ab210574dec9f9607e08c5f8642557c4b46b73c0bbbc00` | 3,679 | `eval-mtf-chromatic@v0.1/impl.mjs` |
 

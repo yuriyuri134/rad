@@ -22,6 +22,7 @@ import {
   atomicWriteFileSync,
   canonicalJson,
   detectRuntimeEnvironment,
+  discoverDeclaredHostModules,
   discoverLocalRelativeDependencies,
   getWorkspacePaths,
   hydrateRunsWithSupplements,
@@ -1068,6 +1069,36 @@ export function migrateWorkspaceToStageA1(
         }
       }
 
+      let pinnedHostModules = v.pinnedHostModules;
+      if (lifecycle === 'frozen' && existsOnDisk && immutableBlobHash) {
+        const discoveredHostMods = discoverDeclaredHostModules(dossier.dependencies);
+        if (pinnedHostModules && pinnedHostModules.length > 0) {
+          pinnedHostModules = pinnedHostModules.map((existing) => {
+            const match = discoveredHostMods.find((m) => m.targetId === existing.targetId);
+            const blobHash = existing.immutableBlobHash || existing.codeHash;
+            if (match && match.codeHash === existing.codeHash) {
+              stagedCasBlobs.set(blobHash, match.codeContent);
+            }
+            return {
+              targetId: existing.targetId,
+              codeHash: existing.codeHash,
+              immutableBlobHash: blobHash,
+              casPath: existing.casPath || `immutable_store/sha256/${blobHash}`,
+            };
+          });
+        } else if (discoveredHostMods.length > 0) {
+          pinnedHostModules = discoveredHostMods.map((mod) => {
+            stagedCasBlobs.set(mod.codeHash, mod.codeContent);
+            return {
+              targetId: mod.targetId,
+              codeHash: mod.codeHash,
+              immutableBlobHash: mod.codeHash,
+              casPath: `immutable_store/sha256/${mod.codeHash}`,
+            };
+          });
+        }
+      }
+
       return {
         ...v,
         lifecycle,
@@ -1077,6 +1108,7 @@ export function migrateWorkspaceToStageA1(
         sourceAvailability,
         immutableBlobHash,
         ...(pinnedRelativeDeps && pinnedRelativeDeps.length > 0 ? { pinnedRelativeDeps } : {}),
+        ...(pinnedHostModules && pinnedHostModules.length > 0 ? { pinnedHostModules } : {}),
         ...(driftedList.length > 0 ? { historicalDriftedHashes: driftedList } : {}),
       };
     });

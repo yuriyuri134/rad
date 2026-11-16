@@ -31,6 +31,8 @@ import {
   resolveAndAssertApproved,
   runComponentSelfCheck,
   runEvaluatorComponent,
+  runOptimizerComponent,
+  runSolverComponent,
 } from './runner.ts';
 
 function runHarnessDirect(payload: Record<string, unknown>): Promise<{ stdout: string; stderr: string; code: number }> {
@@ -637,5 +639,206 @@ export function selfCheck() {
     assert.equal(previewCheck.dossier.selfCheck.status, 'passed');
   } finally {
     fs.rmSync(tmpWs, { recursive: true, force: true });
+  }
+});
+
+test('A1.2.0: pinnedHostModules pins declared src/core/optics.ts into CAS, executes via memory data URL (no fileUrl), survives optics.ts edit/delete, and blocks on unpinned/corrupted mismatch', async () => {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-a120-host-repo-'));
+  const tmpWs = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-a120-host-ws-'));
+  const prevRepoEnv = process.env.OPENLAB_REPO_ROOT;
+
+  try {
+    const realOpticsPath = path.resolve(process.cwd(), 'src', 'core', 'optics.ts');
+    const originalOpticsCode = fs.readFileSync(realOpticsPath, 'utf8');
+    const originalOpticsHash = sha256(originalOpticsCode);
+
+    const isolatedOpticsDir = path.join(tmpRepo, 'src', 'core');
+    const isolatedOpticsPath = path.join(isolatedOpticsDir, 'optics.ts');
+    fs.mkdirSync(isolatedOpticsDir, { recursive: true });
+    fs.writeFileSync(isolatedOpticsPath, originalOpticsCode, 'utf8');
+
+    process.env.OPENLAB_REPO_ROOT = tmpRepo;
+    ensureWorkspaceInitialized(tmpWs);
+
+    // 1. Freezing solver-ts-preview@v0.1 pins src/core/optics.ts into pinnedHostModules & CAS
+    const frozenDossier = freezeComponentVersion(
+      'solver-ts-preview',
+      'v0.1',
+      { runId: 'run-host-cas' },
+      tmpWs,
+    );
+    const frozenVer = frozenDossier.versions.find((v) => v.version === 'v0.1')!;
+    assert.equal(frozenVer.lifecycle, 'frozen');
+    assert.equal(frozenVer.pinnedHostModules?.length, 1);
+    assert.deepEqual(frozenVer.pinnedHostModules?.[0], {
+      targetId: 'src/core/optics.ts',
+      codeHash: originalOpticsHash,
+      immutableBlobHash: originalOpticsHash,
+      casPath: `immutable_store/sha256/${originalOpticsHash}`,
+    });
+
+    const { immutableStoreDir } = getWorkspacePaths(tmpWs);
+    const hostCasBlobPath = path.join(immutableStoreDir, originalOpticsHash);
+    assert.ok(fs.existsSync(hostCasBlobPath));
+    assert.equal(readCasBlob(originalOpticsHash, tmpWs), originalOpticsCode);
+
+    // Harness MUST reject legacy fileUrl-only host module descriptors (never load host module via fileUrl)
+    const previewCtx = resolveAndAssertApproved('solver-ts-preview', 'v0.1', tmpWs);
+    assert.equal(previewCtx.executedFromCas, true);
+    assert.equal(previewCtx.verifiedHostModules['src/core/optics.ts'].code, originalOpticsCode);
+    assert.equal(previewCtx.verifiedHostModules['src/core/optics.ts'].codeHash, originalOpticsHash);
+    assert.equal('fileUrl' in previewCtx.verifiedHostModules['src/core/optics.ts'], false);
+
+    const fileUrlRejectOut = await runHarnessDirect({
+      action: 'check',
+      implPath: previewCtx.implPath,
+      verifiedCode: previewCtx.verifiedCode,
+      expectedCodeHash: previewCtx.verifiedHash,
+      verifiedRelativeDeps: previewCtx.verifiedRelativeDeps,
+      verifiedHostModules: {
+        'src/core/optics.ts': {
+          targetId: 'src/core/optics.ts',
+          absPath: isolatedOpticsPath,
+          fileUrl: `file://${isolatedOpticsPath}`,
+          codeHash: originalOpticsHash,
+        },
+      },
+      params: {},
+    });
+    assert.notEqual(fileUrlRejectOut.code, 0);
+    assert.match(fileUrlRejectOut.stderr, /禁止通过 fileUrl 加载|缺少经校验的 code 字节/);
+
+    // 2. Modify src/core/optics.ts on disk with sabotaged return values -> MUST still execute pinned CAS bytes via memory data URL
+    const sabotagedOpticsCode = `export function traceOpticalSystem() {
+  return {
+    solverEngine: 'ts_preview',
+    paraxialEflMm: 9999,
+    paraxialBflMm: 9999,
+    fNumber: 99,
+    imagePlaneZMm: 9999,
+    totalLengthMm: 9999,
+    rmsSpotRadiusUm: 9999,
+    rmsSpotByWavelengthUm: {},
+    longitudinalSphericalAberrationMm: 99,
+    axialChromaticShiftMm: 99,
+    mtf30LpMm: 0,
+    mtf60LpMm: 0,
+    mtfCurve: [],
+    clippedRayCount: 0,
+    tirRayCount: 0,
+    totalRayCount: 0,
+    meridionalRays: [],
+    spotPoints: [],
+    aberrationFan: [],
+    surfaceVerticesZ: [0, 5],
+  };
+}
+export function extractVariables() { return []; }
+export function applyVariableVector(s) { return s; }
+`;
+    fs.writeFileSync(isolatedOpticsPath, sabotagedOpticsCode, 'utf8');
+
+    const compAfterEdit = getComponent('solver-ts-preview', tmpWs)!;
+    const verAfterEdit = compAfterEdit.dossier.versions.find((v) => v.version === 'v0.1')!;
+    assert.equal(compAfterEdit.dossier.hostModuleDriftDetected, true);
+    assert.equal(verAfterEdit.hostModulesWorkspaceModified, true);
+    assert.equal(verAfterEdit.casAvailable, true);
+
+    const checkAfterEdit = await runComponentSelfCheck('solver-ts-preview', 'v0.1', tmpWs);
+    assert.equal(checkAfterEdit.dossier.selfCheck.status, 'passed');
+    assert.match(checkAfterEdit.dossier.selfCheck.summary, /96\.8/);
+
+    const solveAfterEdit = await runSolverComponent('solver-ts-preview', INITIAL_SINGLET_SPEC, tmpWs);
+    assert.ok(solveAfterEdit.result.paraxialEflMm > 50 && solveAfterEdit.result.paraxialEflMm < 200);
+    assert.notEqual(solveAfterEdit.result.paraxialEflMm, 9999);
+
+    const optAfterEdit = await runOptimizerComponent({
+      optimizerId: 'opt-nelder-mead',
+      evaluatorId: 'eval-rms-spot',
+      evaluatorVersion: 'v0.1',
+      solverId: 'solver-ts-preview',
+      initialSpec: INITIAL_SINGLET_SPEC,
+      workspaceDir: tmpWs,
+    });
+    assert.ok(optAfterEdit.history.length >= 2);
+    assert.ok(optAfterEdit.bestTrace.paraxialEflMm > 50 && optAfterEdit.bestTrace.paraxialEflMm < 200);
+
+    // 3. DELETE src/core/optics.ts completely -> MUST still execute pinned CAS bytes cleanly via memory data URL
+    fs.unlinkSync(isolatedOpticsPath);
+
+    const compAfterDelete = getComponent('solver-ts-preview', tmpWs)!;
+    const verAfterDelete = compAfterDelete.dossier.versions.find((v) => v.version === 'v0.1')!;
+    assert.equal(compAfterDelete.dossier.hostModuleDriftDetected, true);
+    assert.equal(verAfterDelete.hostModulesWorkspaceModified, true);
+    assert.equal(verAfterDelete.casAvailable, true);
+
+    const checkAfterDelete = await runComponentSelfCheck('solver-ts-preview', 'v0.1', tmpWs);
+    assert.equal(checkAfterDelete.dossier.selfCheck.status, 'passed');
+
+    const solveAfterDelete = await runSolverComponent('solver-ts-preview', INITIAL_SINGLET_SPEC, tmpWs);
+    assert.ok(solveAfterDelete.result.paraxialEflMm > 50 && solveAfterDelete.result.paraxialEflMm < 200);
+
+    // 4. Corrupt host CAS blob -> MUST explicitly block execution (never mask CAS corruption)
+    fs.writeFileSync(hostCasBlobPath, sabotagedOpticsCode, 'utf8');
+    const compCasCorrupt = getComponent('solver-ts-preview', tmpWs)!;
+    assert.equal(compCasCorrupt.dossier.casTamperDetected, true);
+    await assert.rejects(
+      () => runComponentSelfCheck('solver-ts-preview', 'v0.1', tmpWs),
+      /CAS 不可变存储完整性校验失败/,
+    );
+    await assert.rejects(
+      () => runSolverComponent('solver-ts-preview', INITIAL_SINGLET_SPEC, tmpWs),
+      /CAS 不可变存储完整性校验失败/,
+    );
+
+    // 5. Delete host CAS blob while src/core/optics.ts is ALSO deleted or modified -> MUST explicitly block execution
+    fs.unlinkSync(hostCasBlobPath);
+    await assert.rejects(
+      () => runComponentSelfCheck('solver-ts-preview', 'v0.1', tmpWs),
+      /明确阻断执行|在 CAS 与工作区均不可用/,
+    );
+
+    fs.writeFileSync(isolatedOpticsPath, sabotagedOpticsCode, 'utf8');
+    await assert.rejects(
+      () => runSolverComponent('solver-ts-preview', INITIAL_SINGLET_SPEC, tmpWs),
+      /明确阻断执行|在 CAS 与工作区均不可用/,
+    );
+
+    // 6. Draft approved with pinnedHostModules MUST block execution if src/core/optics.ts is subsequently modified
+    fs.writeFileSync(isolatedOpticsPath, originalOpticsCode, 'utf8');
+    const stubCode = fs.readFileSync(
+      path.join(getWorkspacePaths(tmpWs).componentsDir, 'solver-ts-preview', 'v0.1', 'impl.mjs'),
+      'utf8',
+    );
+    forkComponentVersion(
+      {
+        componentId: 'solver-ts-preview',
+        baseVersion: 'v0.1',
+        newVersion: 'v0.2-draft-host',
+        changeSummary: 'Draft 宿主模块哈希守卫测试',
+        codeContent: stubCode,
+        updatedParams: {},
+      },
+      tmpWs,
+    );
+    const approvedDraft = approveComponentVersion('solver-ts-preview', 'v0.2-draft-host', 'rad', tmpWs);
+    const draftVer = approvedDraft.versions.find((v) => v.version === 'v0.2-draft-host')!;
+    assert.equal(draftVer.pinnedHostModules?.[0].targetId, 'src/core/optics.ts');
+    assert.equal(draftVer.pinnedHostModules?.[0].codeHash, originalOpticsHash);
+    assert.equal(draftVer.pinnedHostModules?.[0].immutableBlobHash, null);
+
+    fs.writeFileSync(isolatedOpticsPath, sabotagedOpticsCode, 'utf8');
+    assert.throws(
+      () => resolveAndAssertApproved('solver-ts-preview', 'v0.2-draft-host', tmpWs),
+      /安全审查拦截.*宿主模块/,
+    );
+  } finally {
+    if (prevRepoEnv === undefined) {
+      delete process.env.OPENLAB_REPO_ROOT;
+    } else {
+      process.env.OPENLAB_REPO_ROOT = prevRepoEnv;
+    }
+    fs.rmSync(tmpWs, { recursive: true, force: true });
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });

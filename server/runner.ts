@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildArchitectureMap } from '../src/core/architectureMap.ts';
-import { traceOpticalSystem } from '../src/core/optics.ts';
 import type {
   ComponentDossier,
   ComponentVersionRecord,
@@ -14,13 +13,14 @@ import type {
 } from '../src/core/types.ts';
 import {
   detectRuntimeEnvironment,
+  discoverDeclaredHostModules,
   discoverLocalRelativeDependencies,
   getComponent,
   getWorkspacePaths,
   listComponents,
   listRuns,
   readCasBlob,
-  resolveAllowedHostModuleImport,
+  resolveRepoRoot,
   saveComponentDossier,
   sha256,
 } from './storage.ts';
@@ -122,24 +122,23 @@ export interface ApprovedComponentExecutionContext {
   verifiedCode: string;
   verifiedHash: string;
   verifiedRelativeDeps: Record<string, { code: string; codeHash: string }>;
-  verifiedHostModules: Record<string, { targetId: string; absPath: string; fileUrl: string; codeHash: string }>;
+  verifiedHostModules: Record<string, { targetId: string; code: string; codeHash: string }>;
   executedFromCas: boolean;
   frozenWorkspaceModified: boolean;
 }
 
-function collectVerifiedHostModules(
-  dependencies: ComponentDossier['dependencies'] | undefined,
-): Record<string, { targetId: string; absPath: string; fileUrl: string; codeHash: string }> {
-  const out: Record<string, { targetId: string; absPath: string; fileUrl: string; codeHash: string }> = {};
+function getDeclaredHostTargets(dependencies: ComponentDossier['dependencies'] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
   for (const dep of dependencies ?? []) {
-    const targetId = typeof dep === 'string' ? dep : dep.kind === 'module' ? dep.targetId : '';
-    if (!targetId.startsWith('src/core/')) continue;
-    const resolved = resolveAllowedHostModuleImport(`../../../../${targetId}`, dependencies);
-    if (resolved) {
-      out[resolved.targetId] = resolved;
+    const rawTarget = typeof dep === 'string' ? dep : dep.kind === 'module' ? dep.targetId : '';
+    const targetId = path.posix.normalize(rawTarget.replace(/\\/g, '/'));
+    if (targetId.startsWith('src/core/') && !seen.has(targetId)) {
+      seen.add(targetId);
+      out.push(targetId);
     }
   }
-  return out;
+  return out.sort();
 }
 
 export function resolveAndAssertApproved(
@@ -157,7 +156,7 @@ export function resolveAndAssertApproved(
   const { componentsDir } = getWorkspacePaths(workspaceDir);
   const versionDir = path.join(componentsDir, path.basename(dossier.id), ver.version);
   const implPath = getComponentImplPath(dossier, ver, workspaceDir);
-  const verifiedHostModules = collectVerifiedHostModules(dossier.dependencies);
+  const declaredHostTargets = getDeclaredHostTargets(dossier.dependencies);
 
   // If this version is pinned to CAS, ALWAYS verify the CAS blob directly first
   // so CAS corruption is never silently masked by an intact workspace copy.
@@ -194,6 +193,58 @@ export function resolveAndAssertApproved(
       );
     }
 
+    const verifiedHostModules: Record<string, { targetId: string; code: string; codeHash: string }> = {};
+    let hostCasMissing = false;
+    if (declaredHostTargets.length > 0 && (!ver.pinnedHostModules || ver.pinnedHostModules.length === 0)) {
+      throw new Error(
+        `安全校验失败：冻结组件 ${dossier.id}@${ver.version} 声明的宿主模块 (${declaredHostTargets.join(', ')}) 未在 CAS 固定，禁止直接执行。`,
+      );
+    }
+    for (const hostMod of ver.pinnedHostModules ?? []) {
+      if (hostMod.immutableBlobHash) {
+        const casHost = readCasBlob(hostMod.immutableBlobHash, workspaceDir); // Throws immediately if CAS corrupted
+        if (casHost !== null) {
+          if (sha256(casHost) !== hostMod.codeHash) {
+            throw new Error(
+              `CAS 不可变存储哈希冲突：${dossier.id}@${ver.version} 宿主模块 ${hostMod.targetId} 预期 ${hostMod.codeHash}`,
+            );
+          }
+          verifiedHostModules[hostMod.targetId] = {
+            targetId: hostMod.targetId,
+            code: casHost,
+            codeHash: hostMod.codeHash,
+          };
+          continue;
+        }
+        hostCasMissing = true;
+      } else {
+        hostCasMissing = true;
+      }
+      // Fallback for deleted CAS host module: only allowed if repo disk copy strictly matches pinned SHA-256
+      const hostDiskPath = path.resolve(resolveRepoRoot(), hostMod.targetId);
+      if (fs.existsSync(hostDiskPath) && !fs.statSync(hostDiskPath).isDirectory()) {
+        const hostDisk = fs.readFileSync(hostDiskPath, 'utf8');
+        if (sha256(hostDisk) === hostMod.codeHash) {
+          verifiedHostModules[hostMod.targetId] = {
+            targetId: hostMod.targetId,
+            code: hostDisk,
+            codeHash: hostMod.codeHash,
+          };
+          continue;
+        }
+      }
+      throw new Error(
+        `安全校验失败：冻结组件 ${dossier.id}@${ver.version} 的宿主模块 ${hostMod.targetId} 在 CAS 与工作区均不可用或哈希不匹配，明确阻断执行`,
+      );
+    }
+    for (const targetId of declaredHostTargets) {
+      if (!verifiedHostModules[targetId]) {
+        throw new Error(
+          `安全校验失败：冻结组件 ${dossier.id}@${ver.version} 声明的宿主模块 ${targetId} 未在 pinnedHostModules 固定，禁止执行`,
+        );
+      }
+    }
+
     if (casCode !== null) {
       const casHash = sha256(casCode);
       if (casHash !== ver.immutableBlobHash || casHash !== ver.codeHash) {
@@ -204,6 +255,11 @@ export function resolveAndAssertApproved(
       if (depsCasMissing) {
         throw new Error(
           `CAS 不可变存储缺失相对依赖：${dossier.id}@${ver.version} 部分相对依赖 CAS 对象已被删除，请先核验并修复 CAS 归档`,
+        );
+      }
+      if (hostCasMissing) {
+        throw new Error(
+          `CAS 不可变存储缺失宿主模块：${dossier.id}@${ver.version} 部分宿主模块 CAS 对象已被删除，请先核验并修复 CAS 归档`,
         );
       }
 
@@ -234,7 +290,7 @@ export function resolveAndAssertApproved(
       };
     }
     // If primary CAS blob was deleted (casCode === null), fall through to strict disk verification:
-    // if workspace copy was also modified/deleted, line 220+ will reject it; if workspace copy is intact and matches ver.codeHash, it can still run with executedFromCas=false.
+    // if workspace copy was also modified/deleted, below will reject it; if workspace copy is intact and matches ver.codeHash, it can still run with executedFromCas=false.
   }
 
   // Non-frozen Draft (or legacy/deleted-CAS frozen fallback): strictly read & verify disk copy ONCE
@@ -290,6 +346,34 @@ export function resolveAndAssertApproved(
   const verifiedRelativeDeps: Record<string, { code: string; codeHash: string }> = {};
   for (const dep of discoveredDeps) {
     verifiedRelativeDeps[dep.relativePath] = { code: dep.codeContent, codeHash: dep.codeHash };
+  }
+
+  const discoveredHostMods = discoverDeclaredHostModules(dossier.dependencies);
+  if (ver.pinnedHostModules && ver.pinnedHostModules.length > 0) {
+    const hostMismatch =
+      ver.pinnedHostModules.length !== discoveredHostMods.length ||
+      ver.pinnedHostModules.some((pinned, idx) => {
+        const cur = discoveredHostMods[idx];
+        return !cur || cur.targetId !== pinned.targetId || cur.codeHash !== pinned.codeHash;
+      });
+    if (hostMismatch) {
+      throw new Error(
+        `安全审查拦截：组件 ${dossier.name} (${ver.version}) 声明的宿主模块已发生变更或缺失，请重新核对并确认哈希。`,
+      );
+    }
+  } else if (discoveredHostMods.length > 0 && ver.lifecycle === 'frozen') {
+    throw new Error(
+      `安全校验失败：冻结组件 ${dossier.id}@${ver.version} 声明的宿主模块未在 CAS 固定，禁止直接执行。`,
+    );
+  }
+
+  const verifiedHostModules: Record<string, { targetId: string; code: string; codeHash: string }> = {};
+  for (const mod of discoveredHostMods) {
+    verifiedHostModules[mod.targetId] = {
+      targetId: mod.targetId,
+      code: mod.codeContent,
+      codeHash: mod.codeHash,
+    };
   }
 
   return {
@@ -401,7 +485,7 @@ export async function runComponentSelfCheck(
   // local_process_mjs or builtin_ts_preview (which also has impl.mjs selfCheck stub)
   const { stdout } = await runProcessWithStdin(
     'node',
-    [MJS_HARNESS_PATH],
+    ['--no-warnings', MJS_HARNESS_PATH],
     JSON.stringify({
       action: 'check',
       implPath,
@@ -468,7 +552,7 @@ export async function runSolverComponent(
   if (dossier.runtime === 'local_process_mjs') {
     const { stdout } = await runProcessWithStdin(
       'node',
-      [MJS_HARNESS_PATH],
+      ['--no-warnings', MJS_HARNESS_PATH],
       JSON.stringify({
         action: 'standalone',
         implPath,
@@ -488,8 +572,23 @@ export async function runSolverComponent(
     };
   }
 
-  // builtin_ts_preview
-  const result = traceOpticalSystem(spec);
+  // builtin_ts_preview: execute verified host module bytes via memory data URL inside mjs_harness
+  const { stdout } = await runProcessWithStdin(
+    'node',
+    ['--no-warnings', MJS_HARNESS_PATH],
+    JSON.stringify({
+      action: 'trace_host',
+      implPath,
+      verifiedCode,
+      expectedCodeHash: verifiedHash,
+      verifiedRelativeDeps,
+      verifiedHostModules,
+      spec,
+      params: ver.params,
+    }),
+    15000,
+  );
+  const result = JSON.parse(stdout) as RayTraceResult;
   return {
     result,
     solverMeta: { id: dossier.id, name: dossier.name, version: ver.version, codeHash: verifiedHash },
@@ -510,7 +609,7 @@ export async function runEvaluatorComponent(params: {
 
   const { stdout } = await runProcessWithStdin(
     'node',
-    [MJS_HARNESS_PATH],
+    ['--no-warnings', MJS_HARNESS_PATH],
     JSON.stringify({
       action: 'evaluate',
       implPath,
@@ -575,7 +674,7 @@ export async function runOptimizerComponent(params: {
 
   const { stdout } = await runProcessWithStdin(
     'node',
-    [MJS_HARNESS_PATH],
+    ['--no-warnings', MJS_HARNESS_PATH],
     JSON.stringify({
       action: 'optimize',
       implPath: opt.implPath,
@@ -583,6 +682,7 @@ export async function runOptimizerComponent(params: {
       expectedCodeHash: opt.verifiedHash,
       verifiedRelativeDeps: opt.verifiedRelativeDeps,
       verifiedHostModules: opt.verifiedHostModules,
+      solverVerifiedHostModules: solverCheck.verifiedHostModules,
       evalImplPath: ev.implPath,
       evalVerifiedCode: ev.verifiedCode,
       expectedEvalCodeHash: ev.verifiedHash,
@@ -701,7 +801,22 @@ export async function runStandaloneComponent(params: {
     if (!params.spec) {
       throw new Error('独立运行预览光学求解器需要提供 systemSpec 参数');
     }
-    const res = traceOpticalSystem(params.spec);
+    const { stdout } = await runProcessWithStdin(
+      'node',
+      ['--no-warnings', MJS_HARNESS_PATH],
+      JSON.stringify({
+        action: 'trace_host',
+        implPath,
+        verifiedCode,
+        expectedCodeHash: verifiedHash,
+        verifiedRelativeDeps,
+        verifiedHostModules,
+        spec: params.spec,
+        params: mergedParams,
+      }),
+      15000,
+    );
+    const res = JSON.parse(stdout) as RayTraceResult;
     return {
       componentId: dossier.id,
       componentName: dossier.name,
@@ -737,7 +852,7 @@ export async function runStandaloneComponent(params: {
   const action = dossier.kind === 'evaluator' ? 'evaluate' : 'standalone';
   const { stdout } = await runProcessWithStdin(
     'node',
-    [MJS_HARNESS_PATH],
+    ['--no-warnings', MJS_HARNESS_PATH],
     JSON.stringify({
       action,
       implPath,

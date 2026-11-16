@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { traceOpticalSystem } from '../src/core/optics.ts';
 import type {
   ActorAttribution,
@@ -16,6 +15,7 @@ import type {
   ExperimentSnapshot,
   HistoricalHashDriftRecord,
   OpticalSystemSpec,
+  PinnedHostModule,
   PinnedRelativeDep,
   ResearchObject,
   ResearchSnapshot,
@@ -24,6 +24,14 @@ import type {
   StandaloneAnalysisRecord,
   ThreadEntry,
 } from '../src/core/types.ts';
+
+export function resolveRepoRoot(repoRoot?: string): string {
+  if (repoRoot) return path.resolve(repoRoot);
+  if (process.env.OPENLAB_REPO_ROOT) {
+    return path.resolve(process.env.OPENLAB_REPO_ROOT);
+  }
+  return process.cwd();
+}
 
 export function resolveWorkspaceDir(workspaceDir?: string): string {
   if (workspaceDir) return path.resolve(workspaceDir);
@@ -146,8 +154,8 @@ export function extractRelativeImportSpecifiers(code: string): string[] {
 export function resolveAllowedHostModuleImport(
   spec: string,
   dependencies: ComponentDossier['dependencies'] | undefined,
-  repoRoot = process.cwd(),
-): { targetId: string; absPath: string; fileUrl: string; codeHash: string } | null {
+  repoRoot?: string,
+): { targetId: string; absPath: string; codeContent: string; codeHash: string } | null {
   if (!spec.startsWith('../')) return null;
   const normalized = path.posix.normalize(spec.replace(/^(\.\.\/)+/, ''));
   if (!normalized.startsWith('src/core/')) return null;
@@ -158,26 +166,48 @@ export function resolveAllowedHostModuleImport(
   });
   if (!declared) return null;
 
-  const absRoot = path.resolve(repoRoot);
+  const absRoot = resolveRepoRoot(repoRoot);
   const absTarget = path.resolve(absRoot, normalized);
   const rel = path.relative(absRoot, absTarget).replace(/\\/g, '/');
   if (rel !== normalized || !fs.existsSync(absTarget) || fs.statSync(absTarget).isDirectory()) {
     return null;
   }
 
+  const codeContent = fs.readFileSync(absTarget, 'utf8');
   return {
     targetId: normalized,
     absPath: absTarget,
-    fileUrl: pathToFileURL(absTarget).href,
-    codeHash: sha256(fs.readFileSync(absTarget, 'utf8')),
+    codeContent,
+    codeHash: sha256(codeContent),
   };
+}
+
+export function discoverDeclaredHostModules(
+  dependencies: ComponentDossier['dependencies'] | undefined,
+  repoRoot?: string,
+): Array<{ targetId: string; absPath: string; codeContent: string; codeHash: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ targetId: string; absPath: string; codeContent: string; codeHash: string }> = [];
+  for (const dep of dependencies ?? []) {
+    const rawTarget = typeof dep === 'string' ? dep : dep.kind === 'module' ? dep.targetId : '';
+    const targetId = path.posix.normalize(rawTarget.replace(/\\/g, '/'));
+    if (!targetId.startsWith('src/core/') || seen.has(targetId)) continue;
+    seen.add(targetId);
+
+    const resolved = resolveAllowedHostModuleImport(`../../../../${targetId}`, dependencies, repoRoot);
+    if (!resolved) {
+      throw new Error(`宿主模块缺失：组件声明的宿主模块 ${targetId} 在工作区中不存在`);
+    }
+    out.push(resolved);
+  }
+  return out.sort((a, b) => a.targetId.localeCompare(b.targetId));
 }
 
 export function discoverLocalRelativeDependencies(
   versionDir: string,
   entryFile: string,
   dependencies?: ComponentDossier['dependencies'],
-  repoRoot = process.cwd(),
+  repoRoot?: string,
 ): Array<{ relativePath: string; codeContent: string; codeHash: string }> {
   const resolvedRoot = path.resolve(versionDir);
   const entryAbs = path.resolve(resolvedRoot, entryFile);
@@ -1581,6 +1611,38 @@ function hydrateDossierLiveState(
       }
     }
 
+    let hostModulesWorkspaceModified = false;
+    for (const hostMod of v.pinnedHostModules ?? []) {
+      const hostAbsPath = path.resolve(resolveRepoRoot(), hostMod.targetId);
+      if (!fs.existsSync(hostAbsPath) || fs.statSync(hostAbsPath).isDirectory()) {
+        hostModulesWorkspaceModified = true;
+      } else {
+        const hostDiskHash = sha256(fs.readFileSync(hostAbsPath, 'utf8'));
+        if (hostDiskHash !== hostMod.codeHash) {
+          hostModulesWorkspaceModified = true;
+        }
+      }
+
+      if (hostMod.immutableBlobHash) {
+        const hostCas = inspectCasBlob(hostMod.immutableBlobHash, casWsDir);
+        if (hostCas.status === 'corrupted') {
+          casTamperDetected = true;
+          casAvailable = false;
+          casIntegrityStatus = 'corrupted';
+        } else if (hostCas.status !== 'valid') {
+          casAvailable = false;
+          if (casIntegrityStatus === 'valid') {
+            casIntegrityStatus = hostCas.status;
+          }
+        }
+      } else if (lifecycle === 'frozen') {
+        casAvailable = false;
+        if (casIntegrityStatus === 'valid') {
+          casIntegrityStatus = 'unpinned';
+        }
+      }
+    }
+
     const expectedFrozenHash = immutableBlobHash || v.codeHash;
     const workspaceMatchesFrozenHash =
       lifecycle === 'frozen'
@@ -1602,6 +1664,7 @@ function hydrateDossierLiveState(
       workspaceMatchesFrozenHash,
       frozenWorkspaceModified,
       relativeDepsWorkspaceModified,
+      hostModulesWorkspaceModified,
       historicalDriftedHashes: driftedRecords.length > 0 ? driftedRecords : v.historicalDriftedHashes,
     };
   });
@@ -1646,6 +1709,9 @@ function hydrateDossierLiveState(
   let diskTamperDetected = false;
   const frozenDriftDetected = hydratedVersions.some(
     (v) => v.lifecycle === 'frozen' && v.frozenWorkspaceModified === true,
+  );
+  const hostModuleDriftDetected = hydratedVersions.some(
+    (v) => v.lifecycle === 'frozen' && v.hostModulesWorkspaceModified === true,
   );
   const casTamperDetected = hydratedVersions.some((v) => v.casTamperDetected === true);
 
@@ -1704,6 +1770,7 @@ function hydrateDossierLiveState(
     selfCheck,
     diskTamperDetected,
     frozenDriftDetected,
+    hostModuleDriftDetected,
     casTamperDetected,
     diskActualHash,
     impactScope: {
@@ -1777,6 +1844,7 @@ export function saveComponentDossier(dossier: ComponentDossier, workspaceDir?: s
   const cleanDossier: ComponentDossier = { ...dossier };
   delete cleanDossier.diskTamperDetected;
   delete cleanDossier.frozenDriftDetected;
+  delete cleanDossier.hostModuleDriftDetected;
   delete cleanDossier.casTamperDetected;
   delete cleanDossier.diskActualHash;
   delete cleanDossier.impactScope;
@@ -1788,6 +1856,7 @@ export function saveComponentDossier(dossier: ComponentDossier, workspaceDir?: s
     delete copy.workspaceMatchesFrozenHash;
     delete copy.frozenWorkspaceModified;
     delete copy.relativeDepsWorkspaceModified;
+    delete copy.hostModulesWorkspaceModified;
     return copy;
   });
   const dossierPath = path.join(paths.componentsDir, safeId, 'dossier.json');
@@ -2002,6 +2071,49 @@ export function freezeComponentVersion(
         codeHash: d.codeHash,
         immutableBlobHash: writeCasBlob(d.codeContent, workspaceDir),
       }));
+    }
+
+    if (ver.pinnedHostModules && ver.pinnedHostModules.length > 0) {
+      ver.pinnedHostModules = ver.pinnedHostModules.map((hostMod): PinnedHostModule => {
+        if (hostMod.immutableBlobHash) {
+          readCasBlob(hostMod.immutableBlobHash, workspaceDir);
+          return {
+            targetId: hostMod.targetId,
+            codeHash: hostMod.codeHash,
+            immutableBlobHash: hostMod.immutableBlobHash,
+            casPath: hostMod.casPath || `immutable_store/sha256/${hostMod.immutableBlobHash}`,
+          };
+        }
+        const resolved = resolveAllowedHostModuleImport(
+          `../../../../${hostMod.targetId}`,
+          rawDossier.dependencies,
+        );
+        if (resolved && resolved.codeHash === hostMod.codeHash) {
+          const blobHash = writeCasBlob(resolved.codeContent, workspaceDir);
+          return {
+            targetId: hostMod.targetId,
+            codeHash: hostMod.codeHash,
+            immutableBlobHash: blobHash,
+            casPath: `immutable_store/sha256/${blobHash}`,
+          };
+        }
+        throw new Error(
+          `宿主模块哈希冲突：冻结 ${componentId}@${version} 时宿主模块 ${hostMod.targetId} 与已批准哈希 (${hostMod.codeHash}) 不一致`,
+        );
+      });
+    } else {
+      const discoveredHostMods = discoverDeclaredHostModules(rawDossier.dependencies);
+      if (discoveredHostMods.length > 0) {
+        ver.pinnedHostModules = discoveredHostMods.map((mod) => {
+          const blobHash = writeCasBlob(mod.codeContent, workspaceDir);
+          return {
+            targetId: mod.targetId,
+            codeHash: mod.codeHash,
+            immutableBlobHash: blobHash,
+            casPath: `immutable_store/sha256/${blobHash}`,
+          };
+        });
+      }
     }
   }
 
@@ -2231,6 +2343,7 @@ export function approveComponentVersion(
   const actualDiskText = fs.readFileSync(codePath, 'utf8');
   const actualDiskHash = sha256(actualDiskText);
   const discoveredDeps = discoverLocalRelativeDependencies(versionDir, ver.codeFile, found.dossier.dependencies);
+  const discoveredHostMods = discoverDeclaredHostModules(found.dossier.dependencies);
 
   if (ver.lifecycle === 'frozen') {
     if (ver.codeHash !== actualDiskHash) {
@@ -2248,6 +2361,17 @@ export function approveComponentVersion(
     if (depsChanged) {
       throw new Error(`冻结版本 ${componentId}@${version} 的相对依赖文件已被修改，禁止直接覆盖授权，请派生新 Draft 版本。`);
     }
+    if (ver.pinnedHostModules && ver.pinnedHostModules.length > 0) {
+      const hostChanged =
+        ver.pinnedHostModules.length !== discoveredHostMods.length ||
+        ver.pinnedHostModules.some((h, i) => {
+          const cur = discoveredHostMods[i];
+          return !cur || cur.targetId !== h.targetId || cur.codeHash !== h.codeHash;
+        });
+      if (hostChanged) {
+        throw new Error(`冻结版本 ${componentId}@${version} 声明的宿主模块已被修改，禁止直接覆盖授权，请派生新 Draft 版本。`);
+      }
+    }
   } else {
     ver.pinnedRelativeDeps =
       discoveredDeps.length > 0
@@ -2255,6 +2379,15 @@ export function approveComponentVersion(
             relativePath: d.relativePath,
             codeHash: d.codeHash,
             immutableBlobHash: null,
+          }))
+        : undefined;
+    ver.pinnedHostModules =
+      discoveredHostMods.length > 0
+        ? discoveredHostMods.map((m) => ({
+            targetId: m.targetId,
+            codeHash: m.codeHash,
+            immutableBlobHash: null,
+            casPath: null,
           }))
         : undefined;
   }

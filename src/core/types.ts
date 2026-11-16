@@ -87,6 +87,13 @@ export interface PinnedRelativeDep {
   immutableBlobHash?: string | null;
 }
 
+export interface PinnedHostModule {
+  targetId: string;
+  codeHash: string;
+  immutableBlobHash?: string | null;
+  casPath?: string | null;
+}
+
 export interface ComponentVersionRecord {
   version: string;
   createdAt: string;
@@ -103,12 +110,14 @@ export interface ComponentVersionRecord {
   sourceAvailability?: ComponentSourceAvailability;
   immutableBlobHash?: string | null;
   pinnedRelativeDeps?: PinnedRelativeDep[];
+  pinnedHostModules?: PinnedHostModule[];
   casIntegrityStatus?: 'valid' | 'missing' | 'corrupted' | 'unpinned';
   casTamperDetected?: boolean;
   casAvailable?: boolean;
   workspaceMatchesFrozenHash?: boolean;
   frozenWorkspaceModified?: boolean;
   relativeDepsWorkspaceModified?: boolean;
+  hostModulesWorkspaceModified?: boolean;
   historicalDriftedHashes?: HistoricalHashDriftRecord[];
 }
 
@@ -157,6 +166,7 @@ export interface ComponentDossier {
   codeSecurityReview: CodeSecurityReviewState;
   diskTamperDetected?: boolean;
   frozenDriftDetected?: boolean;
+  hostModuleDriftDetected?: boolean;
   casTamperDetected?: boolean;
   diskActualHash?: string;
   impactScope?: {

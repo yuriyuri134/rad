@@ -1,12 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import path from 'node:path';
-import {
-  applyVariableVector,
-  extractVariables,
-  traceOpticalSystem,
-} from '../src/core/optics.ts';
 
 function readStdin() {
   return fs.readFileSync(0, 'utf8').trim();
@@ -20,6 +16,9 @@ function normalizePosix(p) {
   return path.posix.normalize(p.replace(/\\/g, '/'));
 }
 
+const RELATIVE_IMPORT_REGEX =
+  /((?:(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?|import\s*\(\s*))(['"])(\.\.?\/[^'"]+)\2/g;
+
 function resolveRelativeDepKey(fromRelPath, spec) {
   const fromDir = path.posix.dirname(normalizePosix(fromRelPath));
   const joined = fromDir === '.' ? normalizePosix(spec) : path.posix.normalize(path.posix.join(fromDir, spec));
@@ -31,22 +30,66 @@ function resolveRelativeDepKey(fromRelPath, spec) {
   return joined;
 }
 
-function resolveDeclaredHostModuleUrl(spec, verifiedHostModules) {
-  if (!spec.startsWith('../') || !verifiedHostModules || typeof verifiedHostModules !== 'object') {
+function compileVerifiedHostModule(spec, verifiedHostModules, hostMemo, visiting = new Set(), fromTargetId = null) {
+  if (!verifiedHostModules || typeof verifiedHostModules !== 'object') {
     return null;
   }
-  const normalized = path.posix.normalize(spec.replace(/^(\.\.\/)+/, ''));
+
+  let normalized = null;
+  if (fromTargetId === null) {
+    if (!spec.startsWith('../')) return null;
+    normalized = path.posix.normalize(spec.replace(/^(\.\.\/)+/, ''));
+  } else if (spec.startsWith('./') || spec.startsWith('../')) {
+    const baseDir = path.posix.dirname(normalizePosix(fromTargetId));
+    normalized = path.posix.normalize(path.posix.join(baseDir, spec));
+  } else {
+    return null;
+  }
+
   const hostEntry = verifiedHostModules[normalized];
-  if (!hostEntry || typeof hostEntry.absPath !== 'string' || typeof hostEntry.codeHash !== 'string' || typeof hostEntry.fileUrl !== 'string') {
+  if (!hostEntry) {
+    if (fromTargetId !== null) {
+      throw new Error(
+        `宿主模块相对依赖未固定 (${fromTargetId})：引用了 "${spec}" (${normalized})，禁止从磁盘加载`,
+      );
+    }
     return null;
   }
-  const actualHash = sha256(fs.readFileSync(hostEntry.absPath, 'utf8'));
+
+  if (typeof hostEntry.code !== 'string' || typeof hostEntry.codeHash !== 'string') {
+    throw new Error(
+      `宿主模块安全校验失败 (${normalized})：缺少经校验的 code 字节或 codeHash，禁止通过 fileUrl 加载`,
+    );
+  }
+
+  if (hostMemo.has(normalized)) {
+    return hostMemo.get(normalized);
+  }
+  if (visiting.has(normalized)) {
+    throw new Error(`宿主模块循环依赖禁止执行：检测到 ${normalized} 循环引用`);
+  }
+
+  const actualHash = sha256(hostEntry.code);
   if (actualHash !== hostEntry.codeHash) {
     throw new Error(
       `宿主模块哈希校验失败 (${normalized})：实际 ${actualHash} 与预期 ${hostEntry.codeHash} 不一致`,
     );
   }
-  return hostEntry.fileUrl;
+
+  visiting.add(normalized);
+  let jsCode = /\.(ts|mts)$/i.test(normalized)
+    ? stripTypeScriptTypes(hostEntry.code)
+    : hostEntry.code;
+
+  jsCode = jsCode.replace(RELATIVE_IMPORT_REGEX, (_m, prefix, quote, subSpec) => {
+    const depUrl = compileVerifiedHostModule(subSpec, verifiedHostModules, hostMemo, visiting, normalized);
+    return `${prefix}${quote}${depUrl}${quote}`;
+  });
+  visiting.delete(normalized);
+
+  const dataUrl = `data:text/javascript;base64,${Buffer.from(jsCode, 'utf8').toString('base64')}`;
+  hostMemo.set(normalized, dataUrl);
+  return dataUrl;
 }
 
 function compileVerifiedModuleTree(
@@ -69,8 +112,8 @@ function compileVerifiedModuleTree(
 
   const depsMap = verifiedRelativeDeps && typeof verifiedRelativeDeps === 'object' ? verifiedRelativeDeps : {};
   const memo = new Map();
+  const hostMemo = new Map();
   const visiting = new Set();
-  const importRegex = /((?:(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?|import\s*\(\s*))(['"])(\.\.?\/[^'"]+)\2/g;
 
   const compileModule = (relPath, codeText, expectedHash) => {
     if (memo.has(relPath)) return memo.get(relPath);
@@ -85,10 +128,10 @@ function compileVerifiedModuleTree(
     }
 
     visiting.add(relPath);
-    const rewritten = codeText.replace(importRegex, (_m, prefix, quote, spec) => {
-      const hostUrl = resolveDeclaredHostModuleUrl(spec, verifiedHostModules);
-      if (hostUrl) {
-        return `${prefix}${quote}${hostUrl}${quote}`;
+    const rewritten = codeText.replace(RELATIVE_IMPORT_REGEX, (_m, prefix, quote, spec) => {
+      const hostDataUrl = compileVerifiedHostModule(spec, verifiedHostModules, hostMemo);
+      if (hostDataUrl) {
+        return `${prefix}${quote}${hostDataUrl}${quote}`;
       }
       const targetKey = resolveRelativeDepKey(relPath, spec);
       const depEntry = depsMap[targetKey];
@@ -130,7 +173,16 @@ async function importVerifiedModule(
   return await import(dataUrl);
 }
 
-function buildTraceHelper(solverId, pythonBridgePath) {
+async function importVerifiedOpticsHostModule(verifiedHostModules) {
+  const hostMemo = new Map();
+  const dataUrl = compileVerifiedHostModule('../../../../src/core/optics.ts', verifiedHostModules, hostMemo);
+  if (!dataUrl) {
+    throw new Error('宿主模块安全校验失败：未提供已校验的 src/core/optics.ts 字节，拒绝执行');
+  }
+  return await import(dataUrl);
+}
+
+function buildTraceHelper(solverId, pythonBridgePath, opticsMod) {
   if (solverId === 'solver-optiland-python') {
     return (spec) => {
       const stdout = execFileSync('python3', [pythonBridgePath, '--solve'], {
@@ -145,7 +197,7 @@ function buildTraceHelper(solverId, pythonBridgePath) {
       return parsed.result;
     };
   }
-  return (spec) => traceOpticalSystem(spec);
+  return (spec) => opticsMod.traceOpticalSystem(spec);
 }
 
 async function main() {
@@ -158,6 +210,7 @@ async function main() {
     expectedCodeHash,
     verifiedRelativeDeps,
     verifiedHostModules,
+    solverVerifiedHostModules,
     evalImplPath,
     evalVerifiedCode,
     expectedEvalCodeHash,
@@ -170,6 +223,21 @@ async function main() {
     spec,
     initialSpec,
   } = payload;
+
+  if (action === 'trace_host') {
+    await importVerifiedModule(
+      verifiedCode,
+      expectedCodeHash,
+      implPath,
+      verifiedRelativeDeps,
+      verifiedHostModules,
+      'solver_stub',
+    );
+    const opticsMod = await importVerifiedOpticsHostModule(verifiedHostModules);
+    const out = opticsMod.traceOpticalSystem(spec);
+    process.stdout.write(JSON.stringify(out));
+    return;
+  }
 
   const mod = await importVerifiedModule(
     verifiedCode,
@@ -213,12 +281,17 @@ async function main() {
     if (typeof evalMod.evaluate !== 'function') {
       throw new Error('搭配的评价组件未导出 evaluate(rawArtifacts, spec, params)');
     }
+    const hostMap = solverVerifiedHostModules || verifiedHostModules;
+    const opticsMod =
+      hostMap && hostMap['src/core/optics.ts']
+        ? await importVerifiedOpticsHostModule(hostMap)
+        : await import('../src/core/optics.ts');
     const pythonBridgePath =
       process.env.OPENLAB_OPTILAND_BRIDGE || path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
-    const traceFn = buildTraceHelper(solverId, pythonBridgePath);
+    const traceFn = buildTraceHelper(solverId, pythonBridgePath, opticsMod);
     const helpers = {
-      extractVariables,
-      applyVariableVector,
+      extractVariables: opticsMod.extractVariables,
+      applyVariableVector: opticsMod.applyVariableVector,
       trace: traceFn,
       evaluate: (t, s) => evalMod.evaluate(t, s, evalParams || {}),
     };
