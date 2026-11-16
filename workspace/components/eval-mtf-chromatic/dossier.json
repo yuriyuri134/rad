@@ -110,7 +110,19 @@
         "maxChromaticMm": 0.45,
         "eflToleranceMm": 2.5
       },
-      "codeFile": "impl.mjs"
+      "codeFile": "impl.mjs",
+      "lifecycle": "frozen",
+      "frozenAt": "2026-11-16T18:52:28.534Z",
+      "frozenByRunIds": [
+        "run-001",
+        "run-002"
+      ],
+      "frozenBySnapshotIds": [
+        "snap-002-after",
+        "snap-002-before"
+      ],
+      "sourceAvailability": "available_on_disk",
+      "immutableBlobHash": "d6da83ab37f142a720ab210574dec9f9607e08c5f8642557c4b46b73c0bbbc00"
     }
   ]
 }

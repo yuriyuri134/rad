@@ -99,7 +99,18 @@
         "maxIterations": 24,
         "simplexScaleMm": 5.5
       },
-      "codeFile": "impl.mjs"
+      "codeFile": "impl.mjs",
+      "lifecycle": "frozen",
+      "frozenAt": "2026-11-16T18:54:20.726Z",
+      "frozenByRunIds": [
+        "run-002"
+      ],
+      "frozenBySnapshotIds": [
+        "snap-002-after",
+        "snap-002-before"
+      ],
+      "sourceAvailability": "available_on_disk",
+      "immutableBlobHash": "5222c23021279fa26be7f223e670ebaeac96d5cd36f20abfa86a460a575f233a"
     }
   ]
 }

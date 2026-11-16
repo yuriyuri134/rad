@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -10,6 +11,37 @@ import {
 
 function readStdin() {
   return fs.readFileSync(0, 'utf8').trim();
+}
+
+function sha256(content) {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function rewriteRelativeImports(code, baseImplPath) {
+  if (!baseImplPath) return code;
+  const baseDir = path.dirname(path.resolve(baseImplPath));
+  return code.replace(
+    /((?:import|export)\s+(?:[\s\S]*?\s+from\s+)?|import\s*\(\s*)(['"])(\.\.?\/[^'"]+)\2/g,
+    (_m, prefix, quote, relSpec) => {
+      const absUrl = pathToFileURL(path.resolve(baseDir, relSpec)).href;
+      return `${prefix}${quote}${absUrl}${quote}`;
+    },
+  );
+}
+
+async function importVerifiedModule(verifiedCode, expectedCodeHash, baseImplPath, label) {
+  if (typeof verifiedCode !== 'string' || typeof expectedCodeHash !== 'string') {
+    throw new Error(`安全校验失败 (${label})：缺少 verifiedCode 或 expectedCodeHash，禁止从磁盘路径直接加载`);
+  }
+  const actualHash = sha256(verifiedCode);
+  if (actualHash !== expectedCodeHash) {
+    throw new Error(
+      `TOCTOU/哈希校验失败 (${label})：执行字节 SHA-256 (${actualHash}) 与预期 (${expectedCodeHash}) 不一致，拒绝执行`,
+    );
+  }
+  const executableCode = rewriteRelativeImports(verifiedCode, baseImplPath);
+  const dataUrl = `data:text/javascript;base64,${Buffer.from(executableCode, 'utf8').toString('base64')}`;
+  return await import(dataUrl);
 }
 
 function buildTraceHelper(solverId, pythonBridgePath) {
@@ -33,9 +65,23 @@ function buildTraceHelper(solverId, pythonBridgePath) {
 async function main() {
   const raw = readStdin();
   const payload = JSON.parse(raw || '{}');
-  const { action, implPath, evalImplPath, params, evalParams, solverId, trace, spec, initialSpec } = payload;
+  const {
+    action,
+    implPath,
+    verifiedCode,
+    expectedCodeHash,
+    evalImplPath,
+    evalVerifiedCode,
+    expectedEvalCodeHash,
+    params,
+    evalParams,
+    solverId,
+    trace,
+    spec,
+    initialSpec,
+  } = payload;
 
-  const mod = await import(pathToFileURL(path.resolve(implPath)).href);
+  const mod = await importVerifiedModule(verifiedCode, expectedCodeHash, implPath, 'primary');
 
   if (action === 'check') {
     if (typeof mod.selfCheck !== 'function') {
@@ -59,11 +105,17 @@ async function main() {
     if (typeof mod.optimize !== 'function') {
       throw new Error('优化组件未导出 optimize(initialSpec, helpers, params)');
     }
-    const evalMod = await import(pathToFileURL(path.resolve(evalImplPath)).href);
+    const evalMod = await importVerifiedModule(
+      evalVerifiedCode,
+      expectedEvalCodeHash,
+      evalImplPath,
+      'evaluator',
+    );
     if (typeof evalMod.evaluate !== 'function') {
       throw new Error('搭配的评价组件未导出 evaluate(rawArtifacts, spec, params)');
     }
-    const pythonBridgePath = path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
+    const pythonBridgePath =
+      process.env.OPENLAB_OPTILAND_BRIDGE || path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
     const traceFn = buildTraceHelper(solverId, pythonBridgePath);
     const helpers = {
       extractVariables,
@@ -93,3 +145,4 @@ main().catch((err) => {
   process.stderr.write(err instanceof Error ? err.stack || err.message : String(err));
   process.exit(1);
 });
+

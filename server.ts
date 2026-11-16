@@ -43,6 +43,7 @@ import {
   listResearchObjects,
   listRuns,
   listThreadEntries,
+  restoreFrozenComponentWorkspaceFile,
   saveComponentDraft,
   setActiveComponentVersion,
   updateRunEvaluations,
@@ -212,6 +213,26 @@ async function startServer() {
       const { version } = req.body as { version: string };
       const dossier = setActiveComponentVersion(req.params.id, version);
       res.json(getComponent(dossier.id));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.post('/api/components/:id/restore-frozen', (req, res) => {
+    try {
+      const { version, preserveWorkspaceEditAsDraft, newDraftVersion } = req.body as {
+        version: string;
+        preserveWorkspaceEditAsDraft?: boolean;
+        newDraftVersion?: string;
+      };
+      const restored = restoreFrozenComponentWorkspaceFile(req.params.id, version, {
+        preserveWorkspaceEditAsDraft,
+        newDraftVersion,
+      });
+      res.json({
+        ...restored,
+        component: getComponent(req.params.id),
+      });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }

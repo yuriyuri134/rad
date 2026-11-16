@@ -95,6 +95,10 @@ export interface ComponentVersionRecord {
   frozenByRunIds?: string[];
   frozenBySnapshotIds?: string[];
   sourceAvailability?: ComponentSourceAvailability;
+  immutableBlobHash?: string | null;
+  casAvailable?: boolean;
+  workspaceMatchesFrozenHash?: boolean;
+  frozenWorkspaceModified?: boolean;
   historicalDriftedHashes?: HistoricalHashDriftRecord[];
 }
 
@@ -142,6 +146,7 @@ export interface ComponentDossier {
   scientificValidation: ScientificValidationState;
   codeSecurityReview: CodeSecurityReviewState;
   diskTamperDetected?: boolean;
+  frozenDriftDetected?: boolean;
   diskActualHash?: string;
   impactScope?: {
     dependentComponentIds: string[];

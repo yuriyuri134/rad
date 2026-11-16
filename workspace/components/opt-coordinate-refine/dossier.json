@@ -99,7 +99,13 @@
         "maxIterations": 18,
         "initialStepMm": 6
       },
-      "codeFile": "impl.mjs"
+      "codeFile": "impl.mjs",
+      "lifecycle": "draft",
+      "frozenAt": null,
+      "frozenByRunIds": [],
+      "frozenBySnapshotIds": [],
+      "sourceAvailability": "available_on_disk",
+      "immutableBlobHash": null
     }
   ]
 }

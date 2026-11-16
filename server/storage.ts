@@ -36,6 +36,7 @@ export function getWorkspacePaths(workspaceDir?: string) {
   return {
     workspaceDir: root,
     componentsDir: path.join(root, 'components'),
+    immutableStoreDir: path.join(root, 'immutable_store', 'sha256'),
     runsFile: path.join(root, 'runs.jsonl'),
     runSupplementsFile: path.join(root, 'run_supplements.jsonl'),
     threadFile: path.join(root, 'thread.jsonl'),
@@ -73,6 +74,37 @@ export function atomicWriteFileSync(targetPath: string, content: string): void {
 /** Full 64-character SHA-256 hex digest */
 export function sha256(content: string): string {
   return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+export function writeCasBlob(codeContent: string, workspaceDir?: string): string {
+  const hash = sha256(codeContent);
+  const { immutableStoreDir } = getWorkspacePaths(workspaceDir);
+  fs.mkdirSync(immutableStoreDir, { recursive: true });
+  const blobPath = path.join(immutableStoreDir, hash);
+  if (fs.existsSync(blobPath)) {
+    const existing = fs.readFileSync(blobPath, 'utf8');
+    if (sha256(existing) === hash) {
+      return hash;
+    }
+    throw new Error(`CAS 不可变存储检测到内容哈希不一致，拒绝覆盖已有 blob: ${hash}`);
+  }
+  atomicWriteFileSync(blobPath, codeContent);
+  return hash;
+}
+
+export function readCasBlob(expectedHash: string, workspaceDir?: string): string | null {
+  if (!/^[a-f0-9]{64}$/.test(expectedHash)) return null;
+  const { immutableStoreDir } = getWorkspacePaths(workspaceDir);
+  const blobPath = path.join(immutableStoreDir, expectedHash);
+  if (!fs.existsSync(blobPath)) return null;
+  const content = fs.readFileSync(blobPath, 'utf8');
+  const actualHash = sha256(content);
+  if (actualHash !== expectedHash) {
+    throw new Error(
+      `CAS 不可变存储完整性校验失败：blob ${expectedHash} 实际哈希为 ${actualHash}`,
+    );
+  }
+  return content;
 }
 
 export function canonicalJson(value: unknown): string {
@@ -1337,6 +1369,7 @@ function hydrateDossierLiveState(
   runs: ExperimentRun[],
   snapshots: ResearchSnapshot[],
   componentsDir: string,
+  immutableStoreDir: string,
 ): ComponentDossier {
   const legacy = rawDossier as ComponentDossier & { role?: string; verificationStatus?: string };
   const compDir = path.join(componentsDir, path.basename(legacy.id));
@@ -1378,6 +1411,24 @@ function hydrateDossierLiveState(
     const frozenByRunIds = Array.from(new Set([...(v.frozenByRunIds ?? []), ...refs.runIds]));
     const frozenBySnapshotIds = Array.from(new Set([...(v.frozenBySnapshotIds ?? []), ...refs.snapshotIds]));
 
+    const immutableBlobHash = v.immutableBlobHash ?? null;
+    let casAvailable = false;
+    if (immutableBlobHash && /^[a-f0-9]{64}$/.test(immutableBlobHash)) {
+      const blobPath = path.join(immutableStoreDir, immutableBlobHash);
+      if (fs.existsSync(blobPath)) {
+        try {
+          casAvailable = sha256(fs.readFileSync(blobPath, 'utf8')) === immutableBlobHash;
+        } catch {
+          casAvailable = false;
+        }
+      }
+    }
+
+    const expectedFrozenHash = immutableBlobHash || v.codeHash;
+    const workspaceMatchesFrozenHash =
+      lifecycle === 'frozen' ? Boolean(existsOnDisk && diskHash === expectedFrozenHash) : undefined;
+    const frozenWorkspaceModified = lifecycle === 'frozen' ? !workspaceMatchesFrozenHash : false;
+
     return {
       ...v,
       lifecycle,
@@ -1385,6 +1436,10 @@ function hydrateDossierLiveState(
       frozenByRunIds,
       frozenBySnapshotIds,
       sourceAvailability,
+      immutableBlobHash,
+      casAvailable,
+      workspaceMatchesFrozenHash,
+      frozenWorkspaceModified,
       historicalDriftedHashes: driftedRecords.length > 0 ? driftedRecords : v.historicalDriftedHashes,
     };
   });
@@ -1427,6 +1482,9 @@ function hydrateDossierLiveState(
   const activeRec = dossier.versions.find((v) => v.version === dossier.activeVersion) ?? dossier.versions[0];
   let diskActualHash = activeRec?.codeHash;
   let diskTamperDetected = false;
+  const frozenDriftDetected = hydratedVersions.some(
+    (v) => v.lifecycle === 'frozen' && v.frozenWorkspaceModified === true,
+  );
 
   if (activeRec) {
     const codePath = path.join(compDir, activeRec.version, activeRec.codeFile);
@@ -1438,7 +1496,8 @@ function hydrateDossierLiveState(
           diskActualHash !== dossier.codeSecurityReview.approvedHash,
       );
       const mismatchVersionHash = Boolean(activeRec.codeHash && diskActualHash !== activeRec.codeHash);
-      if (mismatchApproved || mismatchVersionHash) {
+      const mismatchFrozen = Boolean(activeRec.lifecycle === 'frozen' && activeRec.frozenWorkspaceModified);
+      if (mismatchApproved || mismatchVersionHash || mismatchFrozen) {
         diskTamperDetected = true;
       }
     } else {
@@ -1480,6 +1539,7 @@ function hydrateDossierLiveState(
     codeSecurityReview: securityReview,
     selfCheck,
     diskTamperDetected,
+    frozenDriftDetected,
     diskActualHash,
     impactScope: {
       dependentComponentIds,
@@ -1508,7 +1568,9 @@ export function listComponents(workspaceDir?: string): ComponentDossier[] {
   }
   const runs = hydrateRunsWithSupplements(listRawRuns(workspaceDir), listRunSupplements(workspaceDir));
   const snapshots = listSnapshots(workspaceDir);
-  return rawDossiers.map((d) => hydrateDossierLiveState(d, rawDossiers, runs, snapshots, paths.componentsDir));
+  return rawDossiers.map((d) =>
+    hydrateDossierLiveState(d, rawDossiers, runs, snapshots, paths.componentsDir, paths.immutableStoreDir),
+  );
 }
 
 export function getComponent(
@@ -1523,16 +1585,24 @@ export function getComponent(
   if (!fs.existsSync(dossierPath)) return null;
 
   const rawDossier = JSON.parse(fs.readFileSync(dossierPath, 'utf8')) as ComponentDossier;
+  const all = listComponents(workspaceDir);
+  const hydrated = all.find((c) => c.id === safeId) ?? rawDossier;
+
   const codeByVersion: Record<string, string> = {};
-  for (const ver of rawDossier.versions) {
+  for (const ver of hydrated.versions) {
+    if (ver.lifecycle === 'frozen' && ver.immutableBlobHash) {
+      const casText = readCasBlob(ver.immutableBlobHash, workspaceDir);
+      if (casText !== null) {
+        codeByVersion[ver.version] = casText;
+        continue;
+      }
+    }
     const codePath = path.join(compDir, ver.version, ver.codeFile);
     if (fs.existsSync(codePath)) {
       codeByVersion[ver.version] = fs.readFileSync(codePath, 'utf8');
     }
   }
 
-  const all = listComponents(workspaceDir);
-  const hydrated = all.find((c) => c.id === safeId) ?? rawDossier;
   return { dossier: hydrated, codeByVersion };
 }
 
@@ -1541,8 +1611,16 @@ export function saveComponentDossier(dossier: ComponentDossier, workspaceDir?: s
   const safeId = path.basename(dossier.id);
   const cleanDossier: ComponentDossier = { ...dossier };
   delete cleanDossier.diskTamperDetected;
+  delete cleanDossier.frozenDriftDetected;
   delete cleanDossier.diskActualHash;
   delete cleanDossier.impactScope;
+  cleanDossier.versions = (cleanDossier.versions ?? []).map((v) => {
+    const copy = { ...v };
+    delete copy.casAvailable;
+    delete copy.workspaceMatchesFrozenHash;
+    delete copy.frozenWorkspaceModified;
+    return copy;
+  });
   const dossierPath = path.join(paths.componentsDir, safeId, 'dossier.json');
   atomicWriteFileSync(dossierPath, JSON.stringify(cleanDossier, null, 2));
 }
@@ -1578,8 +1656,8 @@ export function forkComponentVersion(
   atomicWriteFileSync(path.join(verDir, baseRecord.codeFile), params.codeContent);
 
   const newHash = sha256(params.codeContent);
-  const baseHash = sha256(codeByVersion[params.baseVersion] ?? '');
-  const codeChanged = newHash !== baseHash;
+  const baseCode = codeByVersion[params.baseVersion];
+  const codeChanged = typeof baseCode !== 'string' || newHash !== sha256(baseCode);
 
   const newRecord: ComponentVersionRecord = {
     version: safeNewVersion,
@@ -1595,6 +1673,7 @@ export function forkComponentVersion(
     frozenByRunIds: [],
     frozenBySnapshotIds: [],
     sourceAvailability: 'available_on_disk',
+    immutableBlobHash: null,
   };
 
   dossier.versions.unshift(newRecord);
@@ -1629,8 +1708,9 @@ export function forkComponentVersion(
 }
 
 /**
- * Only Draft versions that are NOT referenced by any Snapshot or ExperimentRun may be edited in place.
- * Frozen versions are strictly immutable and throw an explicit error directing callers to fork a new Draft.
+ * Only Draft versions that are NOT referenced by any Snapshot or ExperimentRun
+ * and whose source exists on disk may be edited in place.
+ * Frozen or missing_on_disk versions throw an explicit error directing callers to fork a new Draft.
  */
 export function saveComponentDraft(
   params: {
@@ -1662,9 +1742,15 @@ export function saveComponentDraft(
 
   const { componentsDir } = getWorkspacePaths(workspaceDir);
   const codePath = path.join(componentsDir, path.basename(dossier.id), ver.version, ver.codeFile);
+  if (ver.sourceAvailability === 'missing_on_disk' || !fs.existsSync(codePath)) {
+    throw new Error(
+      `历史版本 ${dossier.id}@${ver.version} 源码在磁盘缺失 (missing_on_disk)，禁止原地写入新源码，请从该版本派生 (fork) 新的 Draft 版本。`,
+    );
+  }
+
   let codeChanged = false;
   if (typeof params.codeContent === 'string') {
-    const prevHash = fs.existsSync(codePath) ? sha256(fs.readFileSync(codePath, 'utf8')) : ver.codeHash;
+    const prevHash = sha256(fs.readFileSync(codePath, 'utf8'));
     const nextHash = sha256(params.codeContent);
     codeChanged = nextHash !== prevHash;
     atomicWriteFileSync(codePath, params.codeContent);
@@ -1704,15 +1790,23 @@ export function freezeComponentVersion(
   ref: { runId?: string; snapshotId?: string },
   workspaceDir?: string,
 ): ComponentDossier {
-  const found = getComponent(componentId, workspaceDir);
-  if (!found) throw new Error(`未找到组件 ${componentId}`);
-  const { dossier } = found;
-  const ver = dossier.versions.find((v) => v.version === version);
+  const rawDossier = getRawDossier(componentId, workspaceDir);
+  if (!rawDossier) throw new Error(`未找到组件 ${componentId}`);
+  const ver = rawDossier.versions.find((v) => v.version === version);
   if (!ver) throw new Error(`未找到版本 ${componentId}@${version}`);
 
   const { componentsDir } = getWorkspacePaths(workspaceDir);
   const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
   const existsOnDisk = fs.existsSync(codePath);
+
+  if (!ver.immutableBlobHash && existsOnDisk) {
+    const diskContent = fs.readFileSync(codePath, 'utf8');
+    if (sha256(diskContent) === ver.codeHash) {
+      ver.immutableBlobHash = writeCasBlob(diskContent, workspaceDir);
+    }
+  } else if (ver.immutableBlobHash) {
+    readCasBlob(ver.immutableBlobHash, workspaceDir);
+  }
 
   ver.lifecycle = 'frozen';
   ver.frozenAt = ver.frozenAt || new Date().toISOString();
@@ -1728,8 +1822,136 @@ export function freezeComponentVersion(
     ver.sourceAvailability = 'available_on_disk';
   }
 
-  saveComponentDossier(dossier, workspaceDir);
+  saveComponentDossier(rawDossier, workspaceDir);
   return getComponent(componentId, workspaceDir)!.dossier;
+}
+
+export function readFrozenComponentSource(
+  componentId: string,
+  version: string,
+  workspaceDir?: string,
+): {
+  codeContent: string;
+  codeHash: string;
+  source: 'cas' | 'workspace';
+  workspaceMatchesFrozenHash: boolean;
+  frozenWorkspaceModified: boolean;
+} {
+  const found = getComponent(componentId, workspaceDir);
+  if (!found) throw new Error(`未找到组件 ${componentId}`);
+  const { dossier } = found;
+  const ver = dossier.versions.find((v) => v.version === version);
+  if (!ver) throw new Error(`未找到版本 ${componentId}@${version}`);
+
+  const { componentsDir } = getWorkspacePaths(workspaceDir);
+  const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
+  const existsOnDisk = fs.existsSync(codePath);
+  const diskContent = existsOnDisk ? fs.readFileSync(codePath, 'utf8') : null;
+  const diskHash = diskContent !== null ? sha256(diskContent) : null;
+
+  if (ver.immutableBlobHash) {
+    const casContent = readCasBlob(ver.immutableBlobHash, workspaceDir);
+    if (casContent !== null) {
+      const matches = Boolean(existsOnDisk && diskHash === ver.immutableBlobHash);
+      return {
+        codeContent: casContent,
+        codeHash: ver.immutableBlobHash,
+        source: 'cas',
+        workspaceMatchesFrozenHash: matches,
+        frozenWorkspaceModified: !matches,
+      };
+    }
+  }
+
+  if (diskContent !== null && diskHash === ver.codeHash && ver.sourceAvailability !== 'missing_on_disk') {
+    return {
+      codeContent: diskContent,
+      codeHash: ver.codeHash,
+      source: 'workspace',
+      workspaceMatchesFrozenHash: true,
+      frozenWorkspaceModified: false,
+    };
+  }
+
+  throw new Error(`无法读取 ${componentId}@${version} 不可变源码：CAS 与工作区均不可用`);
+}
+
+export function restoreFrozenComponentWorkspaceFile(
+  componentId: string,
+  version: string,
+  options?: { preserveWorkspaceEditAsDraft?: boolean; newDraftVersion?: string },
+  workspaceDir?: string,
+): {
+  dossier: ComponentDossier;
+  restoredFromCasHash: string;
+  preservedDraftVersion: string | null;
+} {
+  const rawBefore = getRawDossier(componentId, workspaceDir);
+  const hydratedBefore = getComponent(componentId, workspaceDir);
+  if (!rawBefore || !hydratedBefore) throw new Error(`未找到组件 ${componentId}`);
+  const ver = hydratedBefore.dossier.versions.find((v) => v.version === version);
+  if (!ver) throw new Error(`未找到版本 ${componentId}@${version}`);
+  if (ver.lifecycle !== 'frozen' || !ver.immutableBlobHash) {
+    throw new Error(`版本 ${componentId}@${version} 未在 CAS 冻结归档，无法从 CAS 恢复`);
+  }
+
+  const casContent = readCasBlob(ver.immutableBlobHash, workspaceDir);
+  if (casContent === null) {
+    throw new Error(`CAS 中未找到 ${componentId}@${version} 的不可变源码 (${ver.immutableBlobHash})`);
+  }
+
+  const { componentsDir } = getWorkspacePaths(workspaceDir);
+  const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
+  const preserveEdit = options?.preserveWorkspaceEditAsDraft ?? true;
+  let preservedDraftVersion: string | null = null;
+
+  const prevActiveVersion = rawBefore.activeVersion;
+  const prevSecurityReview = { ...rawBefore.codeSecurityReview };
+  const prevSelfCheck = { ...rawBefore.selfCheck };
+
+  if (preserveEdit && fs.existsSync(codePath)) {
+    const workspaceText = fs.readFileSync(codePath, 'utf8');
+    if (sha256(workspaceText) !== ver.immutableBlobHash) {
+      let candidateVer = options?.newDraftVersion?.replace(/[^a-zA-Z0-9._-]/g, '');
+      if (!candidateVer) {
+        let idx = 1;
+        while (rawBefore.versions.some((v) => v.version === `${ver.version}-vscode-draft-${idx}`)) {
+          idx++;
+        }
+        candidateVer = `${ver.version}-vscode-draft-${idx}`;
+      }
+      forkComponentVersion(
+        {
+          componentId,
+          baseVersion: ver.version,
+          newVersion: candidateVer,
+          changeSummary: `保留直接修改 ${ver.version} 工作区文件的编辑内容为可编辑 Draft（原冻结版本已从 CAS 恢复）`,
+          codeContent: workspaceText,
+          updatedParams: { ...ver.params },
+          author: 'rad',
+        },
+        workspaceDir,
+      );
+      preservedDraftVersion = candidateVer;
+    }
+  }
+
+  fs.mkdirSync(path.dirname(codePath), { recursive: true });
+  atomicWriteFileSync(codePath, casContent);
+
+  if (preservedDraftVersion) {
+    const updatedRaw = getRawDossier(componentId, workspaceDir)!;
+    updatedRaw.activeVersion = prevActiveVersion;
+    updatedRaw.codeSecurityReview = prevSecurityReview;
+    updatedRaw.selfCheck = prevSelfCheck;
+    saveComponentDossier(updatedRaw, workspaceDir);
+  }
+
+  return {
+    dossier: getComponent(componentId, workspaceDir)!.dossier,
+    restoredFromCasHash: ver.immutableBlobHash,
+    preservedDraftVersion,
+  };
 }
 
 export function approveComponentVersion(

@@ -51,7 +51,13 @@
       "changeSummary": "阶段二预留基线（单元测试通过）",
       "codeHash": "c3f2aa7773644dba11929048641c3b1bc758edb202c3ee10d93c5a22fc81eb97",
       "params": {},
-      "codeFile": "readme.txt"
+      "codeFile": "readme.txt",
+      "lifecycle": "draft",
+      "frozenAt": null,
+      "frozenByRunIds": [],
+      "frozenBySnapshotIds": [],
+      "sourceAvailability": "available_on_disk",
+      "immutableBlobHash": null
     }
   ],
   "selfCheck": {

@@ -65,7 +65,15 @@
       "params": {
         "referenceWavelengthUm": 0.58756
       },
-      "codeFile": "impl.mjs"
+      "codeFile": "impl.mjs",
+      "lifecycle": "frozen",
+      "frozenAt": "2026-11-16T18:54:58.312Z",
+      "frozenByRunIds": [
+        "run-001"
+      ],
+      "frozenBySnapshotIds": [],
+      "sourceAvailability": "available_on_disk",
+      "immutableBlobHash": "cd2ebd44bea79fbfe686a44281294f6a36212c4fbc7c095fce3c8f92ccb18383"
     }
   ],
   "selfCheck": {

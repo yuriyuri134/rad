@@ -99,7 +99,13 @@
         "maxRmsUm": 40,
         "eflToleranceMm": 3
       },
-      "codeFile": "impl.mjs"
+      "codeFile": "impl.mjs",
+      "lifecycle": "draft",
+      "frozenAt": null,
+      "frozenByRunIds": [],
+      "frozenBySnapshotIds": [],
+      "sourceAvailability": "missing_on_disk",
+      "immutableBlobHash": null
     },
     {
       "version": "v0.1",
@@ -113,7 +119,25 @@
         "maxRmsUm": 65,
         "eflToleranceMm": 3
       },
-      "codeFile": "impl.mjs"
+      "codeFile": "impl.mjs",
+      "lifecycle": "frozen",
+      "frozenAt": "2026-11-16T18:47:40.069Z",
+      "frozenByRunIds": [
+        "run-001"
+      ],
+      "frozenBySnapshotIds": [
+        "snap-001"
+      ],
+      "sourceAvailability": "historical_hash_drifted",
+      "immutableBlobHash": "0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b",
+      "historicalDriftedHashes": [
+        {
+          "runId": "run-001",
+          "recordedCodeHash": "a3b03826e7ce6dccbaac59ab5eb8f46b479bbd41b3ce7a3817f66939ce062b55",
+          "diskCodeHashAtAudit": "0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b",
+          "note": "历史运行 run-001 记录的源码哈希 (a3b03826e7ce6dccbaac59ab5eb8f46b479bbd41b3ce7a3817f66939ce062b55) 与当前磁盘文件 (0b2d535914f6e07f262e4421f48c91e0fbb78d912360c5b20e7bf9ef66cb2f8b) 不一致，不得视为同一份源码。"
+        }
+      ]
     }
   ]
 }

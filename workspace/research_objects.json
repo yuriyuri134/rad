@@ -1,0 +1,95 @@
+[
+  {
+    "id": "obj-optics-100mm-f4",
+    "domainId": "optics.geometric",
+    "title": "100mm f/4 成像光学镜头探索（迁移基线）",
+    "problemStatement": "围绕 25mm 入瞳、目标有效焦距 100mm 的成像光学系统，验证不同评价标准（RMS 光斑 vs MTF30/色差）对单透镜与双胶合结构结论的影响，并在保持历史计算产物不可变的前提下展开改进。",
+    "objectives": [
+      {
+        "id": "obj-efl-100",
+        "title": "保持 100mm 目标有效焦距 (EFL)",
+        "description": "在 25mm 入瞳 (f/4) 下维持目标焦距 100mm",
+        "priority": "primary"
+      },
+      {
+        "id": "obj-achromatic-mtf",
+        "title": "抑制轴向色差并提升 MTF30 对比度",
+        "description": "降低 486.13nm–656.27nm 轴向焦移并提升 30 lp/mm MTF",
+        "priority": "primary"
+      },
+      {
+        "id": "obj-ray-integrity",
+        "title": "零孔径遮拦与零全反射异常光线",
+        "description": "clippedRayCount === 0 且 tirRayCount === 0",
+        "priority": "constraint"
+      }
+    ],
+    "criteria": [
+      {
+        "id": "crit-efl",
+        "metricKey": "paraxialEflMm",
+        "label": "有效焦距 (EFL)",
+        "operator": "==",
+        "targetValue": 100,
+        "unit": "mm",
+        "required": true
+      },
+      {
+        "id": "crit-mtf30",
+        "metricKey": "mtf30LpMm",
+        "label": "30 lp/mm MTF",
+        "operator": ">=",
+        "targetValue": 0.35,
+        "required": true
+      },
+      {
+        "id": "crit-chrom",
+        "metricKey": "axialChromaticShiftMm",
+        "label": "F-C 轴向色差",
+        "operator": "<=",
+        "targetValue": 0.45,
+        "unit": "mm",
+        "required": true
+      },
+      {
+        "id": "crit-rms",
+        "metricKey": "rmsSpotRadiusUm",
+        "label": "多波段平均 RMS 光斑半径（初筛参考）",
+        "operator": "<=",
+        "targetValue": 65,
+        "unit": "μm",
+        "required": false
+      }
+    ],
+    "openQuestions": [
+      "run-002 双胶合优化后 F-C 轴向色差降至 0.0714 mm，但 MTF30=0.2237 仍低于 0.35（verdict=warning），尚未确认下一步应放宽目标还是改用新结构。",
+      "eval-rms-spot@v0.1 存在历史哈希漂移（run-001 记录 a3b03826... vs 磁盘 0b2d5359...），eval-rms-spot@v0.2 源码文件在磁盘缺失。"
+    ],
+    "createdAt": "2026-11-16T18:47:40.069Z",
+    "createdBy": {
+      "actorId": "migrated:unknown",
+      "displayName": "旧版记录（操作者未署名）",
+      "actorKind": "migrated_unknown"
+    },
+    "migrationProvenance": {
+      "isMigrated": true,
+      "sourceRecordIds": [
+        "run-001",
+        "run-002"
+      ],
+      "sourceFields": [
+        "runs.jsonl",
+        "thread.jsonl#note-001"
+      ],
+      "inferredFields": [
+        "id",
+        "domainId",
+        "objectives",
+        "criteria",
+        "openQuestions",
+        "createdBy"
+      ],
+      "note": "旧版工作台无 ResearchObject 实体，由 A1.2.1 迁移从 runs.jsonl 与 thread.jsonl 归纳创建。"
+    }
+  }
+]

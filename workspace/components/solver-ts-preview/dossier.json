@@ -75,7 +75,20 @@
       "changeSummary": "初始基线实现与契约档案",
       "codeHash": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52",
       "params": {},
-      "codeFile": "impl.mjs"
+      "codeFile": "impl.mjs",
+      "lifecycle": "frozen",
+      "frozenAt": "2026-11-16T18:47:40.069Z",
+      "frozenByRunIds": [
+        "run-001",
+        "run-002"
+      ],
+      "frozenBySnapshotIds": [
+        "snap-001",
+        "snap-002-after",
+        "snap-002-before"
+      ],
+      "sourceAvailability": "available_on_disk",
+      "immutableBlobHash": "7a774ada741ad3514df3245805a0562f37c2b7a4274b0e3698f258f54ab9de52"
     }
   ]
 }

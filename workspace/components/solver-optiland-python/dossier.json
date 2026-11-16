@@ -85,7 +85,13 @@
       "changeSummary": "初始基线实现与契约档案",
       "codeHash": "15a4ce1a973048d9446cfbe68637db61e6ea60c6dd29a63e5f6385e7a38b749a",
       "params": {},
-      "codeFile": "impl.py"
+      "codeFile": "impl.py",
+      "lifecycle": "draft",
+      "frozenAt": null,
+      "frozenByRunIds": [],
+      "frozenBySnapshotIds": [],
+      "sourceAvailability": "available_on_disk",
+      "immutableBlobHash": null
     }
   ]
 }

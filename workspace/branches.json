@@ -1,0 +1,73 @@
+[
+  {
+    "id": "branch-main-singlet",
+    "researchObjectId": "obj-optics-100mm-f4",
+    "name": "主线 · 单透镜基线",
+    "hypothesis": "观察 N-BK7 单透镜基线在单色 RMS 判据与严格 MTF30/色差判据下的表现差异",
+    "status": "exploring",
+    "owner": {
+      "actorId": "migrated:unknown",
+      "displayName": "旧版记录（操作者未署名）",
+      "actorKind": "migrated_unknown"
+    },
+    "baseSnapshotId": "snap-001",
+    "headSnapshotId": "snap-001",
+    "unadoptedRunIds": [],
+    "adoptedRunIds": [
+      "run-001"
+    ],
+    "createdAt": "2026-11-16T18:47:40.069Z",
+    "updatedAt": "2026-11-16T18:47:40.069Z",
+    "migrationProvenance": {
+      "isMigrated": true,
+      "sourceRecordIds": [
+        "run-001"
+      ],
+      "sourceFields": [
+        "run-001.branchLabel"
+      ],
+      "inferredFields": [
+        "owner",
+        "hypothesis",
+        "status"
+      ],
+      "note": "从 run-001.branchLabel 迁移为独立研究路线。"
+    }
+  },
+  {
+    "id": "branch-b-doublet",
+    "researchObjectId": "obj-optics-100mm-f4",
+    "name": "分支 B · 双胶合消色差",
+    "hypothesis": "使用 N-BK7 + N-SF11 双胶合结构与 Nelder-Mead 优化消除 F-C 轴向色差",
+    "status": "exploring",
+    "owner": {
+      "actorId": "migrated:unknown",
+      "displayName": "旧版记录（操作者未署名）",
+      "actorKind": "migrated_unknown"
+    },
+    "baseSnapshotId": "snap-002-before",
+    "headSnapshotId": "snap-002-before",
+    "unadoptedRunIds": [
+      "run-002"
+    ],
+    "adoptedRunIds": [],
+    "createdAt": "2026-11-16T18:54:20.726Z",
+    "updatedAt": "2026-11-16T18:54:20.726Z",
+    "migrationProvenance": {
+      "isMigrated": true,
+      "sourceRecordIds": [
+        "run-002"
+      ],
+      "sourceFields": [
+        "run-002.branchLabel",
+        "run-002.evaluations"
+      ],
+      "inferredFields": [
+        "owner",
+        "headSnapshotId(保持snap-002-before)",
+        "unadoptedRunIds"
+      ],
+      "note": "没有明确采纳证据，不将 run-002.systemAfter 自动推进为 headSnapshot；优化后的候选结构保留在 unadoptedRunIds 与 snap-002-after。"
+    }
+  }
+]

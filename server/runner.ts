@@ -18,6 +18,7 @@ import {
   getWorkspacePaths,
   listComponents,
   listRuns,
+  readCasBlob,
   saveComponentDossier,
   sha256,
 } from './storage.ts';
@@ -25,11 +26,26 @@ import {
 const MJS_HARNESS_PATH = path.resolve(process.cwd(), 'server', 'mjs_harness.mjs');
 const PYTHON_BRIDGE_PATH = path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
 
+const PYTHON_VERIFIED_BOOTSTRAP = [
+  'import base64, hashlib, os, sys',
+  'code_bytes = base64.b64decode(os.environ["OPENLAB_PY_SOURCE_B64"])',
+  'actual_hash = hashlib.sha256(code_bytes).hexdigest()',
+  'expected_hash = os.environ["OPENLAB_EXPECTED_HASH"]',
+  'if actual_hash != expected_hash:',
+  '    sys.stderr.write(f"TOCTOU/哈希校验失败: actual={actual_hash} expected={expected_hash}\\n")',
+  '    sys.exit(1)',
+  'impl_path = os.environ.get("OPENLAB_IMPL_PATH", "impl.py")',
+  'sys.argv = [impl_path, *sys.argv[1:]]',
+  'ns = {"__name__": "__main__", "__file__": impl_path}',
+  'exec(compile(code_bytes.decode("utf-8"), impl_path, "exec"), ns)',
+].join('\n');
+
 function runProcessWithStdin(
   cmd: string,
   args: string[],
   stdinText: string,
   timeoutMs = 20000,
+  extraEnv?: Record<string, string>,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve, reject) => {
     const proc = execFile(
@@ -41,6 +57,7 @@ function runProcessWithStdin(
         env: {
           ...process.env,
           OPENLAB_OPTILAND_BRIDGE: PYTHON_BRIDGE_PATH,
+          ...(extraEnv ?? {}),
         },
       },
       (err, stdout, stderr) => {
@@ -66,6 +83,27 @@ function runProcessWithStdin(
   });
 }
 
+function runVerifiedPythonComponent(
+  verifiedCode: string,
+  verifiedHash: string,
+  implPath: string,
+  cliFlag: string,
+  stdinText: string,
+  timeoutMs = 15000,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return runProcessWithStdin(
+    'python3',
+    ['-c', PYTHON_VERIFIED_BOOTSTRAP, cliFlag],
+    stdinText,
+    timeoutMs,
+    {
+      OPENLAB_PY_SOURCE_B64: Buffer.from(verifiedCode, 'utf8').toString('base64'),
+      OPENLAB_EXPECTED_HASH: verifiedHash,
+      OPENLAB_IMPL_PATH: implPath,
+    },
+  );
+}
+
 function getComponentImplPath(
   dossier: ComponentDossier,
   ver: ComponentVersionRecord,
@@ -75,11 +113,21 @@ function getComponentImplPath(
   return path.join(componentsDir, path.basename(dossier.id), ver.version, ver.codeFile);
 }
 
-function resolveAndAssertApproved(
+export interface ApprovedComponentExecutionContext {
+  dossier: ComponentDossier;
+  ver: ComponentVersionRecord;
+  implPath: string;
+  verifiedCode: string;
+  verifiedHash: string;
+  executedFromCas: boolean;
+  frozenWorkspaceModified: boolean;
+}
+
+export function resolveAndAssertApproved(
   componentId: string,
   requestedVersion?: string,
   workspaceDir?: string,
-): { dossier: ComponentDossier; ver: ComponentVersionRecord; implPath: string; diskHash: string } {
+): ApprovedComponentExecutionContext {
   const found = getComponent(componentId, workspaceDir);
   if (!found) throw new Error(`未找到组件 ${componentId}`);
   const { dossier } = found;
@@ -88,12 +136,57 @@ function resolveAndAssertApproved(
   if (!ver) throw new Error(`组件 ${dossier.id} 不存在版本 ${versionTag}`);
 
   const implPath = getComponentImplPath(dossier, ver, workspaceDir);
+
+  // Frozen versions with verified CAS blob ALWAYS execute from the immutable CAS copy
+  // so direct edits or deletions in the workspace file cannot hijack or break frozen runs.
+  if (ver.lifecycle === 'frozen' && ver.immutableBlobHash && ver.casAvailable) {
+    const casCode = readCasBlob(ver.immutableBlobHash, workspaceDir);
+    if (casCode !== null) {
+      const casHash = sha256(casCode);
+      if (casHash !== ver.immutableBlobHash || casHash !== ver.codeHash) {
+        throw new Error(
+          `CAS 不可变存储哈希冲突：${dossier.id}@${ver.version} 预期 ${ver.codeHash}，CAS 实际 ${casHash}`,
+        );
+      }
+
+      const isActive = versionTag === dossier.activeVersion;
+      const review = dossier.codeSecurityReview;
+      const approvedForCas = isActive
+        ? review.approvedHash === casHash || (!review.approvedHash && review.status === 'builtin_reviewed')
+        : ver.author === 'system' ||
+          (ver.frozenByRunIds && ver.frozenByRunIds.length > 0) ||
+          review.approvedHash === casHash;
+
+      if (!approvedForCas) {
+        throw new Error(
+          `安全审查拦截：冻结组件 ${dossier.name} (${ver.version}) 尚未经人工哈希确认，禁止直接执行。`,
+        );
+      }
+
+      return {
+        dossier,
+        ver,
+        implPath,
+        verifiedCode: casCode,
+        verifiedHash: casHash,
+        executedFromCas: true,
+        frozenWorkspaceModified: Boolean(ver.frozenWorkspaceModified),
+      };
+    }
+  }
+
+  // Non-frozen Draft (or legacy frozen version without CAS): strictly read & verify disk copy ONCE
   if (ver.sourceAvailability === 'missing_on_disk' || !fs.existsSync(implPath)) {
     throw new Error(`组件 ${dossier.id}@${ver.version} 源码文件在磁盘缺失（仅有历史元数据），禁止伪造或执行：${implPath}`);
   }
-  const diskHash = sha256(fs.readFileSync(implPath, 'utf8'));
+  const diskCode = fs.readFileSync(implPath, 'utf8');
+  const diskHash = sha256(diskCode);
 
-  if (dossier.diskTamperDetected || (versionTag === dossier.activeVersion && dossier.codeSecurityReview.status === 'unreviewed_modified')) {
+  if (
+    diskHash !== ver.codeHash ||
+    (versionTag === dossier.activeVersion && dossier.diskTamperDetected) ||
+    (versionTag === dossier.activeVersion && dossier.codeSecurityReview.status === 'unreviewed_modified')
+  ) {
     throw new Error(
       `安全审查拦截：组件 ${dossier.name} (${ver.version}) 源码已修改或磁盘哈希 (${diskHash.slice(0, 12)}...) 与已确认哈希不一致。本地子进程非 OS 安全沙箱，请先在组件库核对代码并确认哈希。`,
     );
@@ -113,7 +206,15 @@ function resolveAndAssertApproved(
     );
   }
 
-  return { dossier, ver, implPath, diskHash };
+  return {
+    dossier,
+    ver,
+    implPath,
+    verifiedCode: diskCode,
+    verifiedHash: diskHash,
+    executedFromCas: false,
+    frozenWorkspaceModified: false,
+  };
 }
 
 export async function probePythonEnvironment(): Promise<{
@@ -152,7 +253,7 @@ export async function runComponentSelfCheck(
   requestedVersion?: string,
   workspaceDir?: string,
 ): Promise<{ dossier: ComponentDossier; checkOutput: Record<string, unknown> }> {
-  const { dossier, ver, implPath, diskHash } = resolveAndAssertApproved(
+  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
     componentId,
     requestedVersion,
     workspaceDir,
@@ -160,7 +261,7 @@ export async function runComponentSelfCheck(
   const now = new Date().toISOString();
 
   if (dossier.runtime === 'local_process_py') {
-    const { stdout } = await runProcessWithStdin('python3', [implPath, '--check'], '', 12000);
+    const { stdout } = await runVerifiedPythonComponent(verifiedCode, verifiedHash, implPath, '--check', '', 12000);
     const parsed = JSON.parse(stdout || '{}') as {
       status?: string;
       passed?: boolean;
@@ -176,7 +277,7 @@ export async function runComponentSelfCheck(
     dossier.selfCheck = {
       status: nextStatus,
       checkedAt: now,
-      checkedCodeHash: diskHash,
+      checkedCodeHash: verifiedHash,
       summary: parsed.message || 'Python 组件自检完成',
       details: JSON.stringify(parsed.environment ?? {}),
     };
@@ -200,7 +301,7 @@ export async function runComponentSelfCheck(
     dossier.selfCheck = {
       status: passed ? 'passed' : 'failed',
       checkedAt: now,
-      checkedCodeHash: diskHash,
+      checkedCodeHash: verifiedHash,
       summary: passed
         ? `自检通过：扫描 ${map.nodes.length} 个结构节点、${map.edges.length} 条关系边，含受控单步自引用`
         : '自检失败：未能生成自引用结构图谱',
@@ -219,6 +320,8 @@ export async function runComponentSelfCheck(
     JSON.stringify({
       action: 'check',
       implPath,
+      verifiedCode,
+      expectedCodeHash: verifiedHash,
       params: ver.params,
     }),
     10000,
@@ -227,7 +330,7 @@ export async function runComponentSelfCheck(
   dossier.selfCheck = {
     status: parsed.passed ? 'passed' : 'failed',
     checkedAt: now,
-    checkedCodeHash: diskHash,
+    checkedCodeHash: verifiedHash,
     summary: String(parsed.summary ?? (parsed.passed ? '组件自检通过' : '组件自检未通过')),
     details: parsed.details,
   };
@@ -246,12 +349,18 @@ export async function runSolverComponent(
   result: RayTraceResult;
   solverMeta: { id: string; name: string; version: string; codeHash: string };
 }> {
-  const { dossier, ver, implPath, diskHash } = resolveAndAssertApproved(solverId, undefined, workspaceDir);
+  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
+    solverId,
+    undefined,
+    workspaceDir,
+  );
 
   if (dossier.runtime === 'local_process_py') {
-    const { stdout, exitCode } = await runProcessWithStdin(
-      'python3',
-      [implPath, '--solve'],
+    const { stdout, exitCode } = await runVerifiedPythonComponent(
+      verifiedCode,
+      verifiedHash,
+      implPath,
+      '--solve',
       JSON.stringify({ systemSpec: spec }),
       20000,
     );
@@ -268,7 +377,7 @@ export async function runSolverComponent(
     }
     return {
       result: { ...parsed.result, solverEngine: 'optiland' },
-      solverMeta: { id: dossier.id, name: dossier.name, version: ver.version, codeHash: diskHash },
+      solverMeta: { id: dossier.id, name: dossier.name, version: ver.version, codeHash: verifiedHash },
     };
   }
 
@@ -279,6 +388,8 @@ export async function runSolverComponent(
       JSON.stringify({
         action: 'standalone',
         implPath,
+        verifiedCode,
+        expectedCodeHash: verifiedHash,
         spec,
         params: ver.params,
       }),
@@ -287,7 +398,7 @@ export async function runSolverComponent(
     const res = JSON.parse(stdout) as RayTraceResult;
     return {
       result: res,
-      solverMeta: { id: dossier.id, name: dossier.name, version: ver.version, codeHash: diskHash },
+      solverMeta: { id: dossier.id, name: dossier.name, version: ver.version, codeHash: verifiedHash },
     };
   }
 
@@ -295,7 +406,7 @@ export async function runSolverComponent(
   const result = traceOpticalSystem(spec);
   return {
     result,
-    solverMeta: { id: dossier.id, name: dossier.name, version: ver.version, codeHash: diskHash },
+    solverMeta: { id: dossier.id, name: dossier.name, version: ver.version, codeHash: verifiedHash },
   };
 }
 
@@ -307,7 +418,7 @@ export async function runEvaluatorComponent(params: {
   spec: OpticalSystemSpec;
   workspaceDir?: string;
 }): Promise<EvaluationVerdict> {
-  const { dossier, ver, implPath, diskHash } = resolveAndAssertApproved(
+  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
     params.evaluatorId,
     params.evaluatorVersion,
     params.workspaceDir,
@@ -320,6 +431,8 @@ export async function runEvaluatorComponent(params: {
     JSON.stringify({
       action: 'evaluate',
       implPath,
+      verifiedCode,
+      expectedCodeHash: verifiedHash,
       params: mergedParams,
       trace: params.rawArtifacts,
       spec: params.spec,
@@ -337,7 +450,7 @@ export async function runEvaluatorComponent(params: {
     evaluatorId: dossier.id,
     evaluatorName: dossier.name,
     evaluatorVersion: ver.version,
-    evaluatorCodeHash: diskHash,
+    evaluatorCodeHash: verifiedHash,
     evaluatedAt: new Date().toISOString(),
     passed: Boolean(raw.passed),
     status: raw.status ?? (raw.passed ? 'pass' : 'fail'),
@@ -381,7 +494,11 @@ export async function runOptimizerComponent(params: {
     JSON.stringify({
       action: 'optimize',
       implPath: opt.implPath,
+      verifiedCode: opt.verifiedCode,
+      expectedCodeHash: opt.verifiedHash,
       evalImplPath: ev.implPath,
+      evalVerifiedCode: ev.verifiedCode,
+      expectedEvalCodeHash: ev.verifiedHash,
       params: mergedOptParams,
       evalParams: mergedEvalParams,
       solverId: solverCheck.dossier.id,
@@ -410,7 +527,7 @@ export async function runOptimizerComponent(params: {
     evaluatorId: ev.dossier.id,
     evaluatorName: ev.dossier.name,
     evaluatorVersion: ev.ver.version,
-    evaluatorCodeHash: ev.diskHash,
+    evaluatorCodeHash: ev.verifiedHash,
     evaluatedAt: new Date().toISOString(),
     passed: Boolean(result.bestEval.passed),
     status: result.bestEval.status ?? (result.bestEval.passed ? 'pass' : 'fail'),
@@ -435,20 +552,20 @@ export async function runOptimizerComponent(params: {
       id: solverCheck.dossier.id,
       name: solverCheck.dossier.name,
       version: solverCheck.ver.version,
-      codeHash: solverCheck.diskHash,
+      codeHash: solverCheck.verifiedHash,
     },
     optimizerMeta: {
       id: opt.dossier.id,
       name: opt.dossier.name,
       version: opt.ver.version,
-      codeHash: opt.diskHash,
+      codeHash: opt.verifiedHash,
       params: mergedOptParams,
     },
     evaluatorMeta: {
       id: ev.dossier.id,
       name: ev.dossier.name,
       version: ev.ver.version,
-      codeHash: ev.diskHash,
+      codeHash: ev.verifiedHash,
       params: mergedEvalParams,
     },
   };
@@ -469,7 +586,7 @@ export async function runStandaloneComponent(params: {
   codeHash: string;
   output: Record<string, unknown>;
 }> {
-  const { dossier, ver, implPath, diskHash } = resolveAndAssertApproved(
+  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
     params.componentId,
     params.version,
     params.workspaceDir,
@@ -477,9 +594,11 @@ export async function runStandaloneComponent(params: {
   const mergedParams = { ...ver.params, ...(params.overrideParams ?? {}) };
 
   if (dossier.runtime === 'local_process_py') {
-    const { stdout } = await runProcessWithStdin(
-      'python3',
-      [implPath, '--solve'],
+    const { stdout } = await runVerifiedPythonComponent(
+      verifiedCode,
+      verifiedHash,
+      implPath,
+      '--solve',
       JSON.stringify({ systemSpec: params.spec ?? params.customInput ?? {} }),
       15000,
     );
@@ -487,7 +606,7 @@ export async function runStandaloneComponent(params: {
       componentId: dossier.id,
       componentName: dossier.name,
       version: ver.version,
-      codeHash: diskHash,
+      codeHash: verifiedHash,
       output: JSON.parse(stdout || '{}') as Record<string, unknown>,
     };
   }
@@ -501,7 +620,7 @@ export async function runStandaloneComponent(params: {
       componentId: dossier.id,
       componentName: dossier.name,
       version: ver.version,
-      codeHash: diskHash,
+      codeHash: verifiedHash,
       output: res as unknown as Record<string, unknown>,
     };
   }
@@ -518,7 +637,7 @@ export async function runStandaloneComponent(params: {
       componentId: dossier.id,
       componentName: dossier.name,
       version: ver.version,
-      codeHash: diskHash,
+      codeHash: verifiedHash,
       output: {
         nodeCount: map.nodes.length,
         edgeCount: map.edges.length,
@@ -536,6 +655,8 @@ export async function runStandaloneComponent(params: {
     JSON.stringify({
       action,
       implPath,
+      verifiedCode,
+      expectedCodeHash: verifiedHash,
       params: mergedParams,
       trace: params.rawArtifacts,
       spec: params.spec,
@@ -548,7 +669,8 @@ export async function runStandaloneComponent(params: {
     componentId: dossier.id,
     componentName: dossier.name,
     version: ver.version,
-    codeHash: diskHash,
+    codeHash: verifiedHash,
     output: JSON.parse(stdout || '{}') as Record<string, unknown>,
   };
 }
+
