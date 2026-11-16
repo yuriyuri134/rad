@@ -14,11 +14,13 @@ import type {
 } from '../src/core/types.ts';
 import {
   detectRuntimeEnvironment,
+  discoverLocalRelativeDependencies,
   getComponent,
   getWorkspacePaths,
   listComponents,
   listRuns,
   readCasBlob,
+  resolveAllowedHostModuleImport,
   saveComponentDossier,
   sha256,
 } from './storage.ts';
@@ -119,8 +121,25 @@ export interface ApprovedComponentExecutionContext {
   implPath: string;
   verifiedCode: string;
   verifiedHash: string;
+  verifiedRelativeDeps: Record<string, { code: string; codeHash: string }>;
+  verifiedHostModules: Record<string, { targetId: string; absPath: string; fileUrl: string; codeHash: string }>;
   executedFromCas: boolean;
   frozenWorkspaceModified: boolean;
+}
+
+function collectVerifiedHostModules(
+  dependencies: ComponentDossier['dependencies'] | undefined,
+): Record<string, { targetId: string; absPath: string; fileUrl: string; codeHash: string }> {
+  const out: Record<string, { targetId: string; absPath: string; fileUrl: string; codeHash: string }> = {};
+  for (const dep of dependencies ?? []) {
+    const targetId = typeof dep === 'string' ? dep : dep.kind === 'module' ? dep.targetId : '';
+    if (!targetId.startsWith('src/core/')) continue;
+    const resolved = resolveAllowedHostModuleImport(`../../../../${targetId}`, dependencies);
+    if (resolved) {
+      out[resolved.targetId] = resolved;
+    }
+  }
+  return out;
 }
 
 export function resolveAndAssertApproved(
@@ -135,17 +154,56 @@ export function resolveAndAssertApproved(
   const ver = dossier.versions.find((v) => v.version === versionTag);
   if (!ver) throw new Error(`组件 ${dossier.id} 不存在版本 ${versionTag}`);
 
+  const { componentsDir } = getWorkspacePaths(workspaceDir);
+  const versionDir = path.join(componentsDir, path.basename(dossier.id), ver.version);
   const implPath = getComponentImplPath(dossier, ver, workspaceDir);
+  const verifiedHostModules = collectVerifiedHostModules(dossier.dependencies);
 
-  // Frozen versions with verified CAS blob ALWAYS execute from the immutable CAS copy
-  // so direct edits or deletions in the workspace file cannot hijack or break frozen runs.
-  if (ver.lifecycle === 'frozen' && ver.immutableBlobHash && ver.casAvailable) {
-    const casCode = readCasBlob(ver.immutableBlobHash, workspaceDir);
+  // If this version is pinned to CAS, ALWAYS verify the CAS blob directly first
+  // so CAS corruption is never silently masked by an intact workspace copy.
+  if (ver.lifecycle === 'frozen' && ver.immutableBlobHash) {
+    const casCode = readCasBlob(ver.immutableBlobHash, workspaceDir); // Throws immediately if CAS corrupted
+    const verifiedRelativeDeps: Record<string, { code: string; codeHash: string }> = {};
+    let depsCasMissing = false;
+
+    for (const dep of ver.pinnedRelativeDeps ?? []) {
+      const depDiskPath = path.join(versionDir, dep.relativePath);
+      if (dep.immutableBlobHash) {
+        const depCas = readCasBlob(dep.immutableBlobHash, workspaceDir); // Throws immediately if CAS corrupted
+        if (depCas !== null) {
+          if (sha256(depCas) !== dep.codeHash) {
+            throw new Error(
+              `CAS 不可变存储哈希冲突：${dossier.id}@${ver.version}/${dep.relativePath} 预期 ${dep.codeHash}`,
+            );
+          }
+          verifiedRelativeDeps[dep.relativePath] = { code: depCas, codeHash: dep.codeHash };
+          continue;
+        }
+        depsCasMissing = true;
+      }
+      // Fallback for deleted CAS relative dep: only allowed if workspace copy matches pinned hash
+      if (fs.existsSync(depDiskPath)) {
+        const depDisk = fs.readFileSync(depDiskPath, 'utf8');
+        if (sha256(depDisk) === dep.codeHash) {
+          verifiedRelativeDeps[dep.relativePath] = { code: depDisk, codeHash: dep.codeHash };
+          continue;
+        }
+      }
+      throw new Error(
+        `安全校验失败：冻结组件 ${dossier.id}@${ver.version} 的相对依赖 ${dep.relativePath} 在 CAS 与工作区均不可用或哈希不匹配`,
+      );
+    }
+
     if (casCode !== null) {
       const casHash = sha256(casCode);
       if (casHash !== ver.immutableBlobHash || casHash !== ver.codeHash) {
         throw new Error(
           `CAS 不可变存储哈希冲突：${dossier.id}@${ver.version} 预期 ${ver.codeHash}，CAS 实际 ${casHash}`,
+        );
+      }
+      if (depsCasMissing) {
+        throw new Error(
+          `CAS 不可变存储缺失相对依赖：${dossier.id}@${ver.version} 部分相对依赖 CAS 对象已被删除，请先核验并修复 CAS 归档`,
         );
       }
 
@@ -169,13 +227,17 @@ export function resolveAndAssertApproved(
         implPath,
         verifiedCode: casCode,
         verifiedHash: casHash,
+        verifiedRelativeDeps,
+        verifiedHostModules,
         executedFromCas: true,
         frozenWorkspaceModified: Boolean(ver.frozenWorkspaceModified),
       };
     }
+    // If primary CAS blob was deleted (casCode === null), fall through to strict disk verification:
+    // if workspace copy was also modified/deleted, line 220+ will reject it; if workspace copy is intact and matches ver.codeHash, it can still run with executedFromCas=false.
   }
 
-  // Non-frozen Draft (or legacy frozen version without CAS): strictly read & verify disk copy ONCE
+  // Non-frozen Draft (or legacy/deleted-CAS frozen fallback): strictly read & verify disk copy ONCE
   if (ver.sourceAvailability === 'missing_on_disk' || !fs.existsSync(implPath)) {
     throw new Error(`组件 ${dossier.id}@${ver.version} 源码文件在磁盘缺失（仅有历史元数据），禁止伪造或执行：${implPath}`);
   }
@@ -206,12 +268,38 @@ export function resolveAndAssertApproved(
     );
   }
 
+  const discoveredDeps = discoverLocalRelativeDependencies(versionDir, ver.codeFile, dossier.dependencies);
+  if (ver.pinnedRelativeDeps && ver.pinnedRelativeDeps.length > 0) {
+    const mismatch =
+      ver.pinnedRelativeDeps.length !== discoveredDeps.length ||
+      ver.pinnedRelativeDeps.some((pinned, idx) => {
+        const cur = discoveredDeps[idx];
+        return !cur || cur.relativePath !== pinned.relativePath || cur.codeHash !== pinned.codeHash;
+      });
+    if (mismatch) {
+      throw new Error(
+        `安全审查拦截：组件 ${dossier.name} (${ver.version}) 的相对依赖已发生变更或缺失，请重新核对并确认哈希。`,
+      );
+    }
+  } else if (discoveredDeps.length > 0 && ver.lifecycle === 'frozen') {
+    throw new Error(
+      `安全校验失败：冻结组件 ${dossier.id}@${ver.version} 包含未在 CAS 固定的相对依赖，禁止直接执行。`,
+    );
+  }
+
+  const verifiedRelativeDeps: Record<string, { code: string; codeHash: string }> = {};
+  for (const dep of discoveredDeps) {
+    verifiedRelativeDeps[dep.relativePath] = { code: dep.codeContent, codeHash: dep.codeHash };
+  }
+
   return {
     dossier,
     ver,
     implPath,
     verifiedCode: diskCode,
     verifiedHash: diskHash,
+    verifiedRelativeDeps,
+    verifiedHostModules,
     executedFromCas: false,
     frozenWorkspaceModified: false,
   };
@@ -253,11 +341,8 @@ export async function runComponentSelfCheck(
   requestedVersion?: string,
   workspaceDir?: string,
 ): Promise<{ dossier: ComponentDossier; checkOutput: Record<string, unknown> }> {
-  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
-    componentId,
-    requestedVersion,
-    workspaceDir,
-  );
+  const { dossier, ver, implPath, verifiedCode, verifiedHash, verifiedRelativeDeps, verifiedHostModules } =
+    resolveAndAssertApproved(componentId, requestedVersion, workspaceDir);
   const now = new Date().toISOString();
 
   if (dossier.runtime === 'local_process_py') {
@@ -322,6 +407,8 @@ export async function runComponentSelfCheck(
       implPath,
       verifiedCode,
       expectedCodeHash: verifiedHash,
+      verifiedRelativeDeps,
+      verifiedHostModules,
       params: ver.params,
     }),
     10000,
@@ -349,11 +436,8 @@ export async function runSolverComponent(
   result: RayTraceResult;
   solverMeta: { id: string; name: string; version: string; codeHash: string };
 }> {
-  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
-    solverId,
-    undefined,
-    workspaceDir,
-  );
+  const { dossier, ver, implPath, verifiedCode, verifiedHash, verifiedRelativeDeps, verifiedHostModules } =
+    resolveAndAssertApproved(solverId, undefined, workspaceDir);
 
   if (dossier.runtime === 'local_process_py') {
     const { stdout, exitCode } = await runVerifiedPythonComponent(
@@ -390,6 +474,8 @@ export async function runSolverComponent(
         implPath,
         verifiedCode,
         expectedCodeHash: verifiedHash,
+        verifiedRelativeDeps,
+        verifiedHostModules,
         spec,
         params: ver.params,
       }),
@@ -418,11 +504,8 @@ export async function runEvaluatorComponent(params: {
   spec: OpticalSystemSpec;
   workspaceDir?: string;
 }): Promise<EvaluationVerdict> {
-  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
-    params.evaluatorId,
-    params.evaluatorVersion,
-    params.workspaceDir,
-  );
+  const { dossier, ver, implPath, verifiedCode, verifiedHash, verifiedRelativeDeps, verifiedHostModules } =
+    resolveAndAssertApproved(params.evaluatorId, params.evaluatorVersion, params.workspaceDir);
   const mergedParams = { ...ver.params, ...(params.overrideParams ?? {}) };
 
   const { stdout } = await runProcessWithStdin(
@@ -433,6 +516,8 @@ export async function runEvaluatorComponent(params: {
       implPath,
       verifiedCode,
       expectedCodeHash: verifiedHash,
+      verifiedRelativeDeps,
+      verifiedHostModules,
       params: mergedParams,
       trace: params.rawArtifacts,
       spec: params.spec,
@@ -496,9 +581,13 @@ export async function runOptimizerComponent(params: {
       implPath: opt.implPath,
       verifiedCode: opt.verifiedCode,
       expectedCodeHash: opt.verifiedHash,
+      verifiedRelativeDeps: opt.verifiedRelativeDeps,
+      verifiedHostModules: opt.verifiedHostModules,
       evalImplPath: ev.implPath,
       evalVerifiedCode: ev.verifiedCode,
       expectedEvalCodeHash: ev.verifiedHash,
+      evalVerifiedRelativeDeps: ev.verifiedRelativeDeps,
+      evalVerifiedHostModules: ev.verifiedHostModules,
       params: mergedOptParams,
       evalParams: mergedEvalParams,
       solverId: solverCheck.dossier.id,
@@ -586,11 +675,8 @@ export async function runStandaloneComponent(params: {
   codeHash: string;
   output: Record<string, unknown>;
 }> {
-  const { dossier, ver, implPath, verifiedCode, verifiedHash } = resolveAndAssertApproved(
-    params.componentId,
-    params.version,
-    params.workspaceDir,
-  );
+  const { dossier, ver, implPath, verifiedCode, verifiedHash, verifiedRelativeDeps, verifiedHostModules } =
+    resolveAndAssertApproved(params.componentId, params.version, params.workspaceDir);
   const mergedParams = { ...ver.params, ...(params.overrideParams ?? {}) };
 
   if (dossier.runtime === 'local_process_py') {
@@ -657,6 +743,8 @@ export async function runStandaloneComponent(params: {
       implPath,
       verifiedCode,
       expectedCodeHash: verifiedHash,
+      verifiedRelativeDeps,
+      verifiedHostModules,
       params: mergedParams,
       trace: params.rawArtifacts,
       spec: params.spec,

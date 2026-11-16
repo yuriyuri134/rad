@@ -19,6 +19,7 @@ import type {
   ThreadEntry,
 } from './src/core/types.ts';
 import { requestAiCritique } from './server/ai.ts';
+import { recoverInterruptedMigrations } from './server/a1_migrate.ts';
 import {
   probePythonEnvironment,
   runComponentSelfCheck,
@@ -50,6 +51,7 @@ import {
 } from './server/storage.ts';
 
 async function startServer() {
+  recoverInterruptedMigrations();
   ensureWorkspaceInitialized();
 
   const app = express();

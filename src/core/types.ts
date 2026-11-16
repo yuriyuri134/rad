@@ -81,6 +81,12 @@ export interface HistoricalHashDriftRecord {
   note: string;
 }
 
+export interface PinnedRelativeDep {
+  relativePath: string;
+  codeHash: string;
+  immutableBlobHash?: string | null;
+}
+
 export interface ComponentVersionRecord {
   version: string;
   createdAt: string;
@@ -96,9 +102,13 @@ export interface ComponentVersionRecord {
   frozenBySnapshotIds?: string[];
   sourceAvailability?: ComponentSourceAvailability;
   immutableBlobHash?: string | null;
+  pinnedRelativeDeps?: PinnedRelativeDep[];
+  casIntegrityStatus?: 'valid' | 'missing' | 'corrupted' | 'unpinned';
+  casTamperDetected?: boolean;
   casAvailable?: boolean;
   workspaceMatchesFrozenHash?: boolean;
   frozenWorkspaceModified?: boolean;
+  relativeDepsWorkspaceModified?: boolean;
   historicalDriftedHashes?: HistoricalHashDriftRecord[];
 }
 
@@ -147,6 +157,7 @@ export interface ComponentDossier {
   codeSecurityReview: CodeSecurityReviewState;
   diskTamperDetected?: boolean;
   frozenDriftDetected?: boolean;
+  casTamperDetected?: boolean;
   diskActualHash?: string;
   impactScope?: {
     dependentComponentIds: string[];

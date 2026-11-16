@@ -1,0 +1,129 @@
+{
+  "contractId": "openlab-stage-a1-legacy-migration-v1",
+  "spec": {
+    "contractId": "openlab-stage-a1-legacy-migration-v1",
+    "researchObject": {
+      "id": "obj-optics-100mm-f4",
+      "domainId": "optics.geometric",
+      "sourceRunIds": [
+        "run-001",
+        "run-002"
+      ],
+      "sourceThreadIds": [
+        "note-001"
+      ]
+    },
+    "snapshots": {
+      "snap-001": {
+        "rootKind": "initial_root_node",
+        "branchId": "branch-main-singlet",
+        "parentSnapshotId": null,
+        "legacyParentRunId": null,
+        "sourceExperimentRunId": "run-001",
+        "systemSpecField": "run-001.systemBefore",
+        "evidenceGrade": "preview_computed"
+      },
+      "snap-002-before": {
+        "rootKind": "independent_root_node",
+        "branchId": "branch-b-doublet",
+        "parentSnapshotId": null,
+        "legacyParentRunId": "run-001",
+        "sourceExperimentRunId": "run-002",
+        "systemSpecField": "run-002.systemBefore",
+        "evidenceGrade": "preview_computed",
+        "structuralDiscontinuityReason": "run-001 为 2 表面 N-BK7 单透镜，run-002.systemBefore 切换为 3 表面 N-BK7 / N-SF11 双胶合预设；二者不存在可验证的参数继承谱系，固化为独立根节点 (parentSnapshotId: null, legacyParentRunId: \"run-001\")。"
+      },
+      "snap-002-after": {
+        "rootKind": "derived_candidate",
+        "branchId": "branch-b-doublet",
+        "parentSnapshotId": "snap-002-before",
+        "legacyParentRunId": "run-001",
+        "sourceExperimentRunId": "run-002",
+        "systemSpecField": "run-002.systemAfter",
+        "evidenceGrade": "preview_computed"
+      }
+    },
+    "branches": {
+      "branch-main-singlet": {
+        "baseSnapshotId": "snap-001",
+        "headSnapshotId": "snap-001",
+        "adoptedRunIds": [
+          "run-001"
+        ],
+        "unadoptedRunIds": []
+      },
+      "branch-b-doublet": {
+        "baseSnapshotId": "snap-002-before",
+        "headSnapshotId": "snap-002-before",
+        "adoptedRunIds": [],
+        "unadoptedRunIds": [
+          "run-002"
+        ]
+      }
+    },
+    "componentIntegrityExpectations": {
+      "eval-rms-spot@v0.1": {
+        "lifecycle": "frozen",
+        "sourceAvailability": "historical_hash_drifted",
+        "expectedRun001RecordedHash": "a3b03826e7ce6dccbaac59ab5eb8f46b479bbd41b3ce7a3817f66939ce062b55"
+      },
+      "eval-rms-spot@v0.2": {
+        "lifecycle": "draft",
+        "sourceAvailability": "missing_on_disk",
+        "immutableBlobHash": null
+      }
+    }
+  },
+  "legacyInputs": {
+    "runsJsonlSha256": "698ff3e99c846a050abb559620c3602f4e8af65bcd3e4688739b031e9e35b42d",
+    "threadJsonlSha256": "cc80ac9f02d4eededf18970bbf475d8efefce019e945ff31c082e09e60e6439a"
+  },
+  "migratedOutputs": {
+    "researchObjectIds": [
+      "obj-optics-100mm-f4"
+    ],
+    "snapshotLineage": [
+      {
+        "id": "snap-001",
+        "branchId": "branch-main-singlet",
+        "parentSnapshotId": null,
+        "legacyParentRunId": null,
+        "sourceExperimentRunId": "run-001"
+      },
+      {
+        "id": "snap-002-before",
+        "branchId": "branch-b-doublet",
+        "parentSnapshotId": null,
+        "legacyParentRunId": "run-001",
+        "sourceExperimentRunId": "run-002"
+      },
+      {
+        "id": "snap-002-after",
+        "branchId": "branch-b-doublet",
+        "parentSnapshotId": "snap-002-before",
+        "legacyParentRunId": "run-001",
+        "sourceExperimentRunId": "run-002"
+      }
+    ],
+    "branches": [
+      {
+        "id": "branch-main-singlet",
+        "baseSnapshotId": "snap-001",
+        "headSnapshotId": "snap-001",
+        "adoptedRunIds": [
+          "run-001"
+        ],
+        "unadoptedRunIds": []
+      },
+      {
+        "id": "branch-b-doublet",
+        "baseSnapshotId": "snap-002-before",
+        "headSnapshotId": "snap-002-before",
+        "adoptedRunIds": [],
+        "unadoptedRunIds": [
+          "run-002"
+        ]
+      }
+    ]
+  }
+}

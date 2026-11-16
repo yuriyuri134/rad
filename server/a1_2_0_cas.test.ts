@@ -17,6 +17,7 @@ import {
   getComponent,
   getWorkspacePaths,
   INITIAL_SINGLET_SPEC,
+  inspectCasBlob,
   listRuns,
   readCasBlob,
   readFrozenComponentSource,
@@ -395,6 +396,245 @@ test('A1.2.0: missing_on_disk historical versions forbid in-place writes and all
     assert.equal(v03.lifecycle, 'draft');
     assert.equal(v03.parentVersion, 'v0.2');
     assert.equal(v03.sourceAvailability, 'available_on_disk');
+  } finally {
+    fs.rmSync(tmpWs, { recursive: true, force: true });
+  }
+});
+
+test('A1.2.0: CAS blob modification (corruption) and deletion are detected, reject corrupted execution/restore, and fall back only when workspace matches pinned hash', async () => {
+  const tmpWs = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-a120-cas-tamper-'));
+  try {
+    ensureWorkspaceInitialized(tmpWs);
+    const trace = traceOpticalSystem(INITIAL_SINGLET_SPEC);
+
+    const originalCode = `export function evaluate() {
+  return { passed: true, status: 'pass', lossScore: 5, summary: 'CAS_VERIFIED_OK', checks: [], uncertainties: [] };
+}
+export function selfCheck() { return { passed: true, summary: 'ok' }; }
+`;
+    const originalHash = sha256(originalCode);
+    forkComponentVersion(
+      {
+        componentId: 'eval-rms-spot',
+        baseVersion: 'v0.1',
+        newVersion: 'v0.2-cas-guard',
+        changeSummary: 'CAS 损坏与删除测试',
+        codeContent: originalCode,
+        updatedParams: { maxRmsUm: 65 },
+      },
+      tmpWs,
+    );
+    approveComponentVersion('eval-rms-spot', 'v0.2-cas-guard', 'rad', tmpWs);
+    freezeComponentVersion('eval-rms-spot', 'v0.2-cas-guard', { runId: 'run-guard' }, tmpWs);
+
+    const { immutableStoreDir, componentsDir } = getWorkspacePaths(tmpWs);
+    const casBlobPath = path.join(immutableStoreDir, originalHash);
+    const workspaceImplPath = path.join(componentsDir, 'eval-rms-spot', 'v0.2-cas-guard', 'impl.mjs');
+
+    // Case 1: CAS blob is MODIFIED (corrupted) while workspace file is still intact
+    fs.writeFileSync(casBlobPath, originalCode + '\n// corrupted cas payload\n', 'utf8');
+
+    const inspectedCorrupted = inspectCasBlob(originalHash, tmpWs);
+    assert.equal(inspectedCorrupted.status, 'corrupted');
+    assert.notEqual(inspectedCorrupted.actualHash, originalHash);
+
+    const compCorrupted = getComponent('eval-rms-spot', tmpWs)!;
+    const verCorrupted = compCorrupted.dossier.versions.find((v) => v.version === 'v0.2-cas-guard')!;
+    assert.equal(compCorrupted.dossier.casTamperDetected, true);
+    assert.equal(verCorrupted.casTamperDetected, true);
+    assert.equal(verCorrupted.casIntegrityStatus, 'corrupted');
+    assert.equal(verCorrupted.casAvailable, false);
+
+    assert.throws(() => readCasBlob(originalHash, tmpWs), /CAS 不可变存储完整性校验失败/);
+    assert.throws(() => readFrozenComponentSource('eval-rms-spot', 'v0.2-cas-guard', tmpWs), /CAS 不可变存储完整性校验失败/);
+    assert.throws(() => restoreFrozenComponentWorkspaceFile('eval-rms-spot', 'v0.2-cas-guard', undefined, tmpWs), /CAS 不可变存储完整性校验失败/);
+    await assert.rejects(
+      () =>
+        runEvaluatorComponent({
+          evaluatorId: 'eval-rms-spot',
+          evaluatorVersion: 'v0.2-cas-guard',
+          rawArtifacts: trace,
+          spec: INITIAL_SINGLET_SPEC,
+          workspaceDir: tmpWs,
+        }),
+      /CAS 不可变存储完整性校验失败/,
+    );
+
+    // Case 2: CAS blob is DELETED while workspace file is still intact and matches ver.codeHash
+    fs.unlinkSync(casBlobPath);
+    const compMissingCas = getComponent('eval-rms-spot', tmpWs)!;
+    const verMissingCas = compMissingCas.dossier.versions.find((v) => v.version === 'v0.2-cas-guard')!;
+    assert.equal(compMissingCas.dossier.casTamperDetected, false);
+    assert.equal(verMissingCas.casIntegrityStatus, 'missing');
+    assert.equal(verMissingCas.casAvailable, false);
+    assert.equal(verMissingCas.workspaceMatchesFrozenHash, true);
+
+    const fallbackRead = readFrozenComponentSource('eval-rms-spot', 'v0.2-cas-guard', tmpWs);
+    assert.equal(fallbackRead.source, 'workspace');
+    assert.equal(fallbackRead.codeHash, originalHash);
+
+    assert.throws(
+      () => restoreFrozenComponentWorkspaceFile('eval-rms-spot', 'v0.2-cas-guard', undefined, tmpWs),
+      /CAS 中未找到/,
+    );
+
+    const ctxFallback = resolveAndAssertApproved('eval-rms-spot', 'v0.2-cas-guard', tmpWs);
+    assert.equal(ctxFallback.executedFromCas, false);
+    assert.equal(ctxFallback.verifiedHash, originalHash);
+
+    // Case 3: CAS blob is DELETED AND workspace file is ALSO modified or deleted -> strict failure
+    fs.writeFileSync(workspaceImplPath, originalCode + '\n// tampered too\n', 'utf8');
+    assert.throws(() => readFrozenComponentSource('eval-rms-spot', 'v0.2-cas-guard', tmpWs), /CAS 与工作区均不可用/);
+    assert.throws(() => resolveAndAssertApproved('eval-rms-spot', 'v0.2-cas-guard', tmpWs), /安全审查拦截/);
+
+    fs.unlinkSync(workspaceImplPath);
+    assert.throws(() => readFrozenComponentSource('eval-rms-spot', 'v0.2-cas-guard', tmpWs), /CAS 与工作区均不可用/);
+    assert.throws(() => resolveAndAssertApproved('eval-rms-spot', 'v0.2-cas-guard', tmpWs), /源码文件在磁盘缺失/);
+  } finally {
+    fs.rmSync(tmpWs, { recursive: true, force: true });
+  }
+});
+
+test('A1.2.0: Frozen component relative dependencies are pinned into CAS, executed without disk reads, reject ../ escapes, and restore cleanly', async () => {
+  const tmpWs = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-a120-rel-deps-'));
+  try {
+    ensureWorkspaceInitialized(tmpWs);
+    const trace = traceOpticalSystem(INITIAL_SINGLET_SPEC);
+    const { componentsDir, immutableStoreDir } = getWorkspacePaths(tmpWs);
+
+    const mathCode = `export function scaleLoss(val) { return val * 2; }\n`;
+    const helperCode = `import { scaleLoss } from './lib/math.mjs';
+export const TAG = 'PINNED_CAS_HELPER';
+export function computeSummary(maxUm) { return TAG + ':' + scaleLoss(maxUm); }
+`;
+    const entryCode = `import { computeSummary } from './helper.mjs';
+import { scaleLoss } from './lib/math.mjs';
+export function evaluate(_rawArtifacts, _spec, params) {
+  return {
+    passed: true,
+    status: 'pass',
+    lossScore: scaleLoss(10),
+    summary: computeSummary(params.maxRmsUm ?? 50),
+    checks: [],
+    uncertainties: [],
+  };
+}
+export function selfCheck() {
+  return { passed: true, summary: computeSummary(1) };
+}
+`;
+
+    forkComponentVersion(
+      {
+        componentId: 'eval-rms-spot',
+        baseVersion: 'v0.1',
+        newVersion: 'v0.4-deps',
+        changeSummary: '带有多层相对依赖 ./helper.mjs 与 ./lib/math.mjs',
+        codeContent: entryCode,
+        updatedParams: { maxRmsUm: 25 },
+      },
+      tmpWs,
+    );
+
+    const verDir = path.join(componentsDir, 'eval-rms-spot', 'v0.4-deps');
+    fs.mkdirSync(path.join(verDir, 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(verDir, 'helper.mjs'), helperCode, 'utf8');
+    fs.writeFileSync(path.join(verDir, 'lib', 'math.mjs'), mathCode, 'utf8');
+
+    // Approve & freeze: pins both impl.mjs AND helper.mjs AND lib/math.mjs into CAS
+    approveComponentVersion('eval-rms-spot', 'v0.4-deps', 'rad', tmpWs);
+    const frozen = freezeComponentVersion('eval-rms-spot', 'v0.4-deps', { runId: 'run-deps' }, tmpWs);
+    const frozenVer = frozen.versions.find((v) => v.version === 'v0.4-deps')!;
+
+    assert.equal(frozenVer.pinnedRelativeDeps?.length, 2);
+    assert.deepEqual(
+      frozenVer.pinnedRelativeDeps?.map((d) => d.relativePath),
+      ['helper.mjs', 'lib/math.mjs'],
+    );
+    for (const dep of frozenVer.pinnedRelativeDeps!) {
+      assert.ok(dep.immutableBlobHash);
+      assert.ok(fs.existsSync(path.join(immutableStoreDir, dep.immutableBlobHash!)));
+    }
+
+    // Mutate helper.mjs and DELETE lib/math.mjs on disk -> must detect drift, yet STILL execute CAS-pinned bytes!
+    fs.writeFileSync(
+      path.join(verDir, 'helper.mjs'),
+      `export function computeSummary() { return 'DISK_HIJACKED_HELPER'; }\n`,
+      'utf8',
+    );
+    fs.unlinkSync(path.join(verDir, 'lib', 'math.mjs'));
+
+    const driftedComp = getComponent('eval-rms-spot', tmpWs)!;
+    const driftedVer = driftedComp.dossier.versions.find((v) => v.version === 'v0.4-deps')!;
+    assert.equal(driftedVer.relativeDepsWorkspaceModified, true);
+    assert.equal(driftedVer.frozenWorkspaceModified, true);
+    assert.equal(driftedComp.dossier.frozenDriftDetected, true);
+    assert.equal(driftedComp.dossier.diskTamperDetected, true);
+
+    const verdict = await runEvaluatorComponent({
+      evaluatorId: 'eval-rms-spot',
+      evaluatorVersion: 'v0.4-deps',
+      rawArtifacts: trace,
+      spec: INITIAL_SINGLET_SPEC,
+      workspaceDir: tmpWs,
+    });
+    assert.equal(verdict.lossScore, 20);
+    assert.equal(verdict.summary, 'PINNED_CAS_HELPER:50');
+
+    // Restore from CAS must restore BOTH helper.mjs and deleted lib/math.mjs
+    const restored = restoreFrozenComponentWorkspaceFile('eval-rms-spot', 'v0.4-deps', undefined, tmpWs);
+    assert.deepEqual(restored.restoredRelativePaths, ['helper.mjs', 'lib/math.mjs']);
+    assert.equal(fs.readFileSync(path.join(verDir, 'helper.mjs'), 'utf8'), helperCode);
+    assert.equal(fs.readFileSync(path.join(verDir, 'lib', 'math.mjs'), 'utf8'), mathCode);
+    assert.equal(restored.dossier.frozenDriftDetected, false);
+    assert.equal(restored.dossier.diskTamperDetected, false);
+
+    // Relative import escaping version directory via ../ MUST be rejected
+    forkComponentVersion(
+      {
+        componentId: 'eval-rms-spot',
+        baseVersion: 'v0.1',
+        newVersion: 'v0.5-escape',
+        changeSummary: '尝试 ../ 越界引用',
+        codeContent: `import { evaluate as ev } from '../v0.1/impl.mjs'; export const evaluate = ev;`,
+        updatedParams: {},
+      },
+      tmpWs,
+    );
+    assert.throws(
+      () => approveComponentVersion('eval-rms-spot', 'v0.5-escape', 'rad', tmpWs),
+      /越界|逃逸组件版本目录/,
+    );
+
+    // Approved Draft relative dep disk edit MUST trigger 安全审查拦截
+    forkComponentVersion(
+      {
+        componentId: 'eval-rms-spot',
+        baseVersion: 'v0.1',
+        newVersion: 'v0.6-draft-deps',
+        changeSummary: 'Draft 相对依赖防篡改测试',
+        codeContent: entryCode,
+        updatedParams: { maxRmsUm: 30 },
+      },
+      tmpWs,
+    );
+    const draftDir = path.join(componentsDir, 'eval-rms-spot', 'v0.6-draft-deps');
+    fs.mkdirSync(path.join(draftDir, 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(draftDir, 'helper.mjs'), helperCode, 'utf8');
+    fs.writeFileSync(path.join(draftDir, 'lib', 'math.mjs'), mathCode, 'utf8');
+    approveComponentVersion('eval-rms-spot', 'v0.6-draft-deps', 'rad', tmpWs);
+
+    // Tamper helper.mjs in Draft without re-approving
+    fs.appendFileSync(path.join(draftDir, 'helper.mjs'), '\n// unapproved helper edit\n', 'utf8');
+    assert.throws(
+      () => resolveAndAssertApproved('eval-rms-spot', 'v0.6-draft-deps', tmpWs),
+      /安全审查拦截/,
+    );
+
+    // Declared host core module (solver-ts-preview -> src/core/optics.ts) works even when Frozen in CAS inside tmpWs
+    freezeComponentVersion('solver-ts-preview', 'v0.1', { runId: 'run-host-mod' }, tmpWs);
+    const previewCheck = await runComponentSelfCheck('solver-ts-preview', 'v0.1', tmpWs);
+    assert.equal(previewCheck.dossier.selfCheck.status, 'passed');
   } finally {
     fs.rmSync(tmpWs, { recursive: true, force: true });
   }

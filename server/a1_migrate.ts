@@ -22,6 +22,7 @@ import {
   atomicWriteFileSync,
   canonicalJson,
   detectRuntimeEnvironment,
+  discoverLocalRelativeDependencies,
   getWorkspacePaths,
   hydrateRunsWithSupplements,
   listRawRuns,
@@ -30,9 +31,101 @@ import {
   writeCasBlob,
 } from './storage.ts';
 
+export const LEGACY_MIGRATION_MAPPING_SPEC = {
+  contractId: 'openlab-stage-a1-legacy-migration-v1',
+  researchObject: {
+    id: 'obj-optics-100mm-f4',
+    domainId: 'optics.geometric',
+    sourceRunIds: ['run-001', 'run-002'],
+    sourceThreadIds: ['note-001'],
+  },
+  snapshots: {
+    'snap-001': {
+      rootKind: 'initial_root_node' as const,
+      branchId: 'branch-main-singlet',
+      parentSnapshotId: null,
+      legacyParentRunId: null,
+      sourceExperimentRunId: 'run-001',
+      systemSpecField: 'run-001.systemBefore',
+      evidenceGrade: 'preview_computed' as const,
+    },
+    'snap-002-before': {
+      rootKind: 'independent_root_node' as const,
+      branchId: 'branch-b-doublet',
+      parentSnapshotId: null, // 固化规则：尽管 run-002.parentRunId === "run-001"，但结构从 2 面单透镜切换为 3 面双胶合，必须作为独立根节点
+      legacyParentRunId: 'run-001',
+      sourceExperimentRunId: 'run-002',
+      systemSpecField: 'run-002.systemBefore',
+      evidenceGrade: 'preview_computed' as const,
+      structuralDiscontinuityReason:
+        'run-001 为 2 表面 N-BK7 单透镜，run-002.systemBefore 切换为 3 表面 N-BK7 / N-SF11 双胶合预设；二者不存在可验证的参数继承谱系，固化为独立根节点 (parentSnapshotId: null, legacyParentRunId: "run-001")。',
+    },
+    'snap-002-after': {
+      rootKind: 'derived_candidate' as const,
+      branchId: 'branch-b-doublet',
+      parentSnapshotId: 'snap-002-before',
+      legacyParentRunId: 'run-001',
+      sourceExperimentRunId: 'run-002',
+      systemSpecField: 'run-002.systemAfter',
+      evidenceGrade: 'preview_computed' as const,
+    },
+  },
+  branches: {
+    'branch-main-singlet': {
+      baseSnapshotId: 'snap-001',
+      headSnapshotId: 'snap-001',
+      adoptedRunIds: ['run-001'],
+      unadoptedRunIds: [] as string[],
+    },
+    'branch-b-doublet': {
+      baseSnapshotId: 'snap-002-before',
+      headSnapshotId: 'snap-002-before',
+      adoptedRunIds: [] as string[],
+      unadoptedRunIds: ['run-002'],
+    },
+  },
+  componentIntegrityExpectations: {
+    'eval-rms-spot@v0.1': {
+      lifecycle: 'frozen' as const,
+      sourceAvailability: 'historical_hash_drifted' as const,
+      expectedRun001RecordedHash:
+        'a3b03826e7ce6dccbaac59ab5eb8f46b479bbd41b3ce7a3817f66939ce062b55',
+    },
+    'eval-rms-spot@v0.2': {
+      lifecycle: 'draft' as const,
+      sourceAvailability: 'missing_on_disk' as const,
+      immutableBlobHash: null,
+    },
+  },
+} as const;
+
+export interface MigrationJournal {
+  contractId: string;
+  migrationId: string;
+  phase: 'preparing' | 'committing' | 'committed';
+  startedAt: string;
+  updatedAt: string;
+  targets: Array<{
+    relativePath: string;
+    existedBefore: boolean;
+    backupRelPath: string;
+    stagedHash: string;
+  }>;
+}
+
+export interface CrashRecoveryEntry {
+  migrationId: string;
+  phaseAtCrash: MigrationJournal['phase'];
+  action: 'cleaned_preparing' | 'rolled_back_after_crash' | 'finalized_committed';
+  restoredCount: number;
+  removedCount: number;
+}
+
 export interface MigrationOptions {
-  /** Test-only hook: throws an error after committing N target files to exercise rollback recovery */
+  /** Test-only hook: throws inside commit try/catch after N files to exercise exception rollback */
   simulateCommitFailureAfterFiles?: number;
+  /** Test-only hook: simulates abrupt SIGKILL crash mid-commit WITHOUT running catch rollback, leaving journal.json in phase="committing" */
+  simulateCrashWithoutRollbackAfterFiles?: number;
 }
 
 export interface MigrationCorrespondenceReport {
@@ -73,6 +166,117 @@ export interface MigrationResult {
   }>;
   correspondence: MigrationCorrespondenceReport;
   rolledBack?: boolean;
+  recoveredPriorCrashes?: CrashRecoveryEntry[];
+}
+
+export class SimulatedProcessCrashError extends Error {
+  readonly migrationId: string;
+  readonly committedBeforeCrash: number;
+  constructor(migrationId: string, committedBeforeCrash: number) {
+    super(`模拟进程异常崩溃 (SIGKILL, migrationId=${migrationId}, 已写入 ${committedBeforeCrash} 个目标文件，未执行 catch 回滚)`);
+    this.name = 'SimulatedProcessCrashError';
+    this.migrationId = migrationId;
+    this.committedBeforeCrash = committedBeforeCrash;
+  }
+}
+
+function cleanupEmptyMigrationDirs(workspaceDir: string): void {
+  const paths = getWorkspacePaths(workspaceDir);
+  const immRoot = path.join(paths.workspaceDir, 'immutable_store');
+  if (fs.existsSync(paths.immutableStoreDir) && fs.readdirSync(paths.immutableStoreDir).length === 0) {
+    fs.rmdirSync(paths.immutableStoreDir);
+  }
+  if (fs.existsSync(immRoot) && fs.readdirSync(immRoot).length === 0) {
+    fs.rmdirSync(immRoot);
+  }
+  const migrationTmpRoot = path.join(paths.workspaceDir, '.migration_tmp');
+  if (fs.existsSync(migrationTmpRoot) && fs.readdirSync(migrationTmpRoot).length === 0) {
+    fs.rmdirSync(migrationTmpRoot);
+  }
+}
+
+/**
+ * Crash Recovery (distinct from in-process try/catch exception rollback):
+ * Scans `.migration_tmp/stage-a1-* /journal.json` left behind if the Node process crashed (SIGKILL/OOM/power loss)
+ * mid-commit before `catch` could execute.
+ * - phase === 'preparing': formal files untouched -> clean staging dir safely.
+ * - phase === 'committing': half-committed state -> deterministically replay rollback/ in reverse order.
+ * - phase === 'committed': all targets committed & verified before crash -> clean leftover staging dir.
+ */
+export function recoverInterruptedMigrations(workspaceDir?: string): CrashRecoveryEntry[] {
+  const paths = getWorkspacePaths(workspaceDir);
+  const migrationTmpRoot = path.join(paths.workspaceDir, '.migration_tmp');
+  if (!fs.existsSync(migrationTmpRoot)) {
+    return [];
+  }
+
+  const dirs = fs
+    .readdirSync(migrationTmpRoot, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.startsWith('stage-a1-'))
+    .sort((a, b) => b.name.localeCompare(a.name)); // Newest first
+
+  const recovered: CrashRecoveryEntry[] = [];
+
+  for (const dir of dirs) {
+    const stagingDir = path.join(migrationTmpRoot, dir.name);
+    const journalPath = path.join(stagingDir, 'journal.json');
+    if (!fs.existsSync(journalPath)) {
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      continue;
+    }
+
+    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf8')) as MigrationJournal;
+    let restoredCount = 0;
+    let removedCount = 0;
+
+    if (journal.phase === 'committing') {
+      for (const target of [...journal.targets].reverse()) {
+        const targetAbs = path.join(paths.workspaceDir, target.relativePath);
+        const backupAbs = path.join(stagingDir, target.backupRelPath);
+        if (target.existedBefore) {
+          if (!fs.existsSync(backupAbs)) {
+            throw new Error(
+              `崩溃恢复失败：${journal.migrationId} 缺失回滚备份文件 ${target.backupRelPath}`,
+            );
+          }
+          fs.mkdirSync(path.dirname(targetAbs), { recursive: true });
+          fs.copyFileSync(backupAbs, targetAbs);
+          restoredCount++;
+        } else if (fs.existsSync(targetAbs)) {
+          fs.unlinkSync(targetAbs);
+          removedCount++;
+        }
+      }
+      recovered.push({
+        migrationId: journal.migrationId,
+        phaseAtCrash: journal.phase,
+        action: 'rolled_back_after_crash',
+        restoredCount,
+        removedCount,
+      });
+    } else if (journal.phase === 'preparing') {
+      recovered.push({
+        migrationId: journal.migrationId,
+        phaseAtCrash: journal.phase,
+        action: 'cleaned_preparing',
+        restoredCount: 0,
+        removedCount: 0,
+      });
+    } else {
+      recovered.push({
+        migrationId: journal.migrationId,
+        phaseAtCrash: journal.phase,
+        action: 'finalized_committed',
+        restoredCount: 0,
+        removedCount: 0,
+      });
+    }
+
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+  }
+
+  cleanupEmptyMigrationDirs(paths.workspaceDir);
+  return recovered;
 }
 
 const MIGRATED_UNKNOWN_ACTOR: ActorAttribution = {
@@ -357,16 +561,40 @@ function verifyStagingConstraints(params: {
 }): void {
   const { snapshots, branches, supplements, updatedDossiers, runs } = params;
 
+  const snap001 = snapshots.find((s) => s.id === 'snap-001');
+  if (
+    !snap001 ||
+    snap001.parentSnapshotId !== LEGACY_MIGRATION_MAPPING_SPEC.snapshots['snap-001'].parentSnapshotId ||
+    snap001.branchId !== LEGACY_MIGRATION_MAPPING_SPEC.snapshots['snap-001'].branchId
+  ) {
+    throw new Error('迁移校验失败：snap-001 不符合固化迁移映射契约');
+  }
+
+  const run1Ref = runs.find((r) => r.id === 'run-001');
+  const run2Ref = runs.find((r) => r.id === 'run-002');
   const snap002Before = snapshots.find((s) => s.id === 'snap-002-before');
-  if (!snap002Before || snap002Before.parentSnapshotId !== null || snap002Before.legacyParentRunId !== 'run-001') {
-    throw new Error('迁移校验失败：snap-002-before.parentSnapshotId 必须为 null，且保留 legacyParentRunId="run-001"');
+  if (
+    !snap002Before ||
+    snap002Before.parentSnapshotId !== null ||
+    snap002Before.legacyParentRunId !== 'run-001' ||
+    snap002Before.branchId !== LEGACY_MIGRATION_MAPPING_SPEC.snapshots['snap-002-before'].branchId
+  ) {
+    throw new Error('迁移校验失败：snap-002-before 必须固化为独立根节点 (parentSnapshotId=null, legacyParentRunId="run-001")');
+  }
+  if (run1Ref && run2Ref && run1Ref.systemAfter.surfaces.length === run2Ref.systemBefore.surfaces.length) {
+    throw new Error('迁移校验失败：run-001 与 run-002 表面拓扑未发生预期结构切换，需重新审视独立根节点规则');
+  }
+
+  const snap002After = snapshots.find((s) => s.id === 'snap-002-after');
+  if (!snap002After || snap002After.parentSnapshotId !== 'snap-002-before') {
+    throw new Error('迁移校验失败：snap-002-after.parentSnapshotId 必须指向 snap-002-before');
   }
 
   const branchB = branches.find((b) => b.id === 'branch-b-doublet');
   if (
     !branchB ||
-    branchB.baseSnapshotId !== 'snap-002-before' ||
-    branchB.headSnapshotId !== 'snap-002-before' ||
+    branchB.baseSnapshotId !== LEGACY_MIGRATION_MAPPING_SPEC.branches['branch-b-doublet'].baseSnapshotId ||
+    branchB.headSnapshotId !== LEGACY_MIGRATION_MAPPING_SPEC.branches['branch-b-doublet'].headSnapshotId ||
     !branchB.unadoptedRunIds.includes('run-002') ||
     branchB.adoptedRunIds.length !== 0
   ) {
@@ -430,6 +658,9 @@ export function migrateWorkspaceToStageA1(
   workspaceDir: string,
   options?: MigrationOptions,
 ): MigrationResult {
+  // First recover any interrupted migration left behind by a prior SIGKILL/process crash
+  const recoveredPriorCrashes = recoverInterruptedMigrations(workspaceDir);
+
   const paths = getWorkspacePaths(workspaceDir);
   const runs = readRawRunsStrict(paths.runsFile);
   const threadEntries = readThreadEntries(paths.threadFile);
@@ -457,10 +688,11 @@ export function migrateWorkspaceToStageA1(
   });
 
   // 1. Build staging workspace directory
-  const stamp = `${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}`;
-  const stagingDir = path.join(paths.workspaceDir, '.migration_tmp', `stage-a1-${stamp}`);
+  const migrationId = `stage-a1-${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}-${Math.random().toString(36).slice(2, 6)}`;
+  const stagingDir = path.join(paths.workspaceDir, '.migration_tmp', migrationId);
   const stageFilesDir = path.join(stagingDir, 'staged');
   const rollbackDir = path.join(stagingDir, 'rollback');
+  const journalPath = path.join(stagingDir, 'journal.json');
   fs.mkdirSync(stageFilesDir, { recursive: true });
   fs.mkdirSync(rollbackDir, { recursive: true });
 
@@ -820,6 +1052,22 @@ export function migrateWorkspaceToStageA1(
         stagedCasBlobs.set(immutableBlobHash, diskText);
       }
 
+      let pinnedRelativeDeps = v.pinnedRelativeDeps;
+      if (lifecycle === 'frozen' && existsOnDisk && immutableBlobHash) {
+        const versionDir = path.join(paths.componentsDir, dirName, v.version);
+        const discoveredDeps = discoverLocalRelativeDependencies(versionDir, v.codeFile, dossier.dependencies);
+        if (discoveredDeps.length > 0) {
+          pinnedRelativeDeps = discoveredDeps.map((dep) => {
+            stagedCasBlobs.set(dep.codeHash, dep.codeContent);
+            return {
+              relativePath: dep.relativePath,
+              codeHash: dep.codeHash,
+              immutableBlobHash: dep.codeHash,
+            };
+          });
+        }
+      }
+
       return {
         ...v,
         lifecycle,
@@ -828,6 +1076,7 @@ export function migrateWorkspaceToStageA1(
         frozenBySnapshotIds: snapIds,
         sourceAvailability,
         immutableBlobHash,
+        ...(pinnedRelativeDeps && pinnedRelativeDeps.length > 0 ? { pinnedRelativeDeps } : {}),
         ...(driftedList.length > 0 ? { historicalDriftedHashes: driftedList } : {}),
       };
     });
@@ -838,6 +1087,7 @@ export function migrateWorkspaceToStageA1(
     };
     delete cleaned.diskTamperDetected;
     delete cleaned.frozenDriftDetected;
+    delete cleaned.casTamperDetected;
     delete cleaned.diskActualHash;
     delete cleaned.impactScope;
 
@@ -884,6 +1134,33 @@ export function migrateWorkspaceToStageA1(
   );
   stageFile('run_supplements.jsonl', allSupplements.map((s) => JSON.stringify(s)).join('\n') + '\n');
 
+  const migrationManifest = {
+    contractId: LEGACY_MIGRATION_MAPPING_SPEC.contractId,
+    spec: LEGACY_MIGRATION_MAPPING_SPEC,
+    legacyInputs: {
+      runsJsonlSha256: legacyDigestsBefore.find((d) => d.relativePath === 'runs.jsonl')?.sha256 ?? null,
+      threadJsonlSha256: legacyDigestsBefore.find((d) => d.relativePath === 'thread.jsonl')?.sha256 ?? null,
+    },
+    migratedOutputs: {
+      researchObjectIds: researchObjects.map((r) => r.id),
+      snapshotLineage: snapshots.map((s) => ({
+        id: s.id,
+        branchId: s.branchId,
+        parentSnapshotId: s.parentSnapshotId,
+        legacyParentRunId: s.legacyParentRunId,
+        sourceExperimentRunId: s.sourceExperimentRunId,
+      })),
+      branches: branches.map((b) => ({
+        id: b.id,
+        baseSnapshotId: b.baseSnapshotId,
+        headSnapshotId: b.headSnapshotId,
+        adoptedRunIds: b.adoptedRunIds,
+        unadoptedRunIds: b.unadoptedRunIds,
+      })),
+    },
+  };
+  stageFile('migration_a1_manifest.json', JSON.stringify(migrationManifest, null, 2) + '\n');
+
   for (const { dirName, dossier } of updatedDossiers) {
     stageFile(path.join('components', dirName, 'dossier.json'), JSON.stringify(dossier, null, 2) + '\n');
   }
@@ -892,26 +1169,68 @@ export function migrateWorkspaceToStageA1(
     stageFile(path.join('immutable_store', 'sha256', blobHash), blobContent);
   }
 
-  // 7. Save rollback snapshot of every target file that already exists
+  // 7. Save rollback snapshot of every target file that already exists + durable journal (phase: 'preparing')
   const rollbackRecords: Array<{
     targetPath: string;
+    relativePath: string;
     existedBefore: boolean;
     backupPath: string;
+    backupRelPath: string;
+    stagedHash: string;
   }> = [];
 
   for (const item of commitTargets) {
-    const rel = path.relative(paths.workspaceDir, item.targetPath);
-    const backupPath = path.join(rollbackDir, rel);
+    const rel = path.relative(paths.workspaceDir, item.targetPath).replace(/\\/g, '/');
+    const backupRelPath = path.join('rollback', rel).replace(/\\/g, '/');
+    const backupPath = path.join(stagingDir, backupRelPath);
     if (fs.existsSync(item.targetPath)) {
       fs.mkdirSync(path.dirname(backupPath), { recursive: true });
       fs.copyFileSync(item.targetPath, backupPath);
-      rollbackRecords.push({ targetPath: item.targetPath, existedBefore: true, backupPath });
+      rollbackRecords.push({
+        targetPath: item.targetPath,
+        relativePath: rel,
+        existedBefore: true,
+        backupPath,
+        backupRelPath,
+        stagedHash: sha256(item.content),
+      });
     } else {
-      rollbackRecords.push({ targetPath: item.targetPath, existedBefore: false, backupPath });
+      rollbackRecords.push({
+        targetPath: item.targetPath,
+        relativePath: rel,
+        existedBefore: false,
+        backupPath,
+        backupRelPath,
+        stagedHash: sha256(item.content),
+      });
     }
   }
 
-  // 8. Commit atomically with rollback protection
+  const startedAt = new Date().toISOString();
+  const journalTargets: MigrationJournal['targets'] = rollbackRecords.map((r) => ({
+    relativePath: r.relativePath,
+    existedBefore: r.existedBefore,
+    backupRelPath: r.backupRelPath,
+    stagedHash: r.stagedHash,
+  }));
+
+  const writeJournal = (phase: MigrationJournal['phase']) => {
+    const journal: MigrationJournal = {
+      contractId: LEGACY_MIGRATION_MAPPING_SPEC.contractId,
+      migrationId,
+      phase,
+      startedAt,
+      updatedAt: new Date().toISOString(),
+      targets: journalTargets,
+    };
+    atomicWriteFileSync(journalPath, JSON.stringify(journal, null, 2) + '\n');
+  };
+
+  writeJournal('preparing');
+  // Transition journal to 'committing' BEFORE touching any formal target file
+  writeJournal('committing');
+
+  // 8. Commit atomically with exception rollback protection
   const committedFiles: string[] = [];
   let committedCount = 0;
 
@@ -931,6 +1250,13 @@ export function migrateWorkspaceToStageA1(
       committedCount++;
 
       if (
+        typeof options?.simulateCrashWithoutRollbackAfterFiles === 'number' &&
+        committedCount >= options.simulateCrashWithoutRollbackAfterFiles
+      ) {
+        throw new SimulatedProcessCrashError(migrationId, committedCount);
+      }
+
+      if (
         typeof options?.simulateCommitFailureAfterFiles === 'number' &&
         committedCount >= options.simulateCommitFailureAfterFiles
       ) {
@@ -938,7 +1264,12 @@ export function migrateWorkspaceToStageA1(
       }
     }
   } catch (err) {
-    // Rollback all touched targets!
+    // If simulating an abrupt SIGKILL crash, do NOT execute in-process rollback so restart crash recovery can be verified!
+    if (err instanceof SimulatedProcessCrashError) {
+      throw err;
+    }
+
+    // In-process exception rollback: restore/remove all touched targets immediately
     for (const rec of rollbackRecords.reverse()) {
       if (rec.existedBefore) {
         fs.mkdirSync(path.dirname(rec.targetPath), { recursive: true });
@@ -947,18 +1278,8 @@ export function migrateWorkspaceToStageA1(
         fs.unlinkSync(rec.targetPath);
       }
     }
-    const immRoot = path.join(paths.workspaceDir, 'immutable_store');
-    if (fs.existsSync(paths.immutableStoreDir) && fs.readdirSync(paths.immutableStoreDir).length === 0) {
-      fs.rmdirSync(paths.immutableStoreDir);
-    }
-    if (fs.existsSync(immRoot) && fs.readdirSync(immRoot).length === 0) {
-      fs.rmdirSync(immRoot);
-    }
     fs.rmSync(stagingDir, { recursive: true, force: true });
-    const migrationTmpRoot = path.join(paths.workspaceDir, '.migration_tmp');
-    if (fs.existsSync(migrationTmpRoot) && fs.readdirSync(migrationTmpRoot).length === 0) {
-      fs.rmdirSync(migrationTmpRoot);
-    }
+    cleanupEmptyMigrationDirs(paths.workspaceDir);
     throw err;
   }
 
@@ -1024,12 +1345,10 @@ export function migrateWorkspaceToStageA1(
     allSupplements,
   });
 
-  // Clean up temporary staging folder upon verified commit
+  // Mark journal as committed, then clean up temporary staging folder upon verified commit
+  writeJournal('committed');
   fs.rmSync(stagingDir, { recursive: true, force: true });
-  const migrationTmpRoot = path.join(paths.workspaceDir, '.migration_tmp');
-  if (fs.existsSync(migrationTmpRoot) && fs.readdirSync(migrationTmpRoot).length === 0) {
-    fs.rmdirSync(migrationTmpRoot);
-  }
+  cleanupEmptyMigrationDirs(paths.workspaceDir);
 
   return {
     success: true,
@@ -1037,6 +1356,7 @@ export function migrateWorkspaceToStageA1(
     stagingDir,
     committedFiles,
     legacyFilesUntouched,
+    recoveredPriorCrashes,
     correspondence: {
       runsCount: runs.length,
       threadEntriesCount: threadEntries.length,

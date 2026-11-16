@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import {
   applyVariableVector,
   extractVariables,
@@ -17,19 +16,47 @@ function sha256(content) {
   return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
 }
 
-function rewriteRelativeImports(code, baseImplPath) {
-  if (!baseImplPath) return code;
-  const baseDir = path.dirname(path.resolve(baseImplPath));
-  return code.replace(
-    /((?:import|export)\s+(?:[\s\S]*?\s+from\s+)?|import\s*\(\s*)(['"])(\.\.?\/[^'"]+)\2/g,
-    (_m, prefix, quote, relSpec) => {
-      const absUrl = pathToFileURL(path.resolve(baseDir, relSpec)).href;
-      return `${prefix}${quote}${absUrl}${quote}`;
-    },
-  );
+function normalizePosix(p) {
+  return path.posix.normalize(p.replace(/\\/g, '/'));
 }
 
-async function importVerifiedModule(verifiedCode, expectedCodeHash, baseImplPath, label) {
+function resolveRelativeDepKey(fromRelPath, spec) {
+  const fromDir = path.posix.dirname(normalizePosix(fromRelPath));
+  const joined = fromDir === '.' ? normalizePosix(spec) : path.posix.normalize(path.posix.join(fromDir, spec));
+  if (joined === '..' || joined.startsWith('../') || path.posix.isAbsolute(joined)) {
+    throw new Error(
+      `相对依赖安全拦截：${fromRelPath} 引用了越界路径 "${spec}"，禁止访问组件版本目录之外的相对模块`,
+    );
+  }
+  return joined;
+}
+
+function resolveDeclaredHostModuleUrl(spec, verifiedHostModules) {
+  if (!spec.startsWith('../') || !verifiedHostModules || typeof verifiedHostModules !== 'object') {
+    return null;
+  }
+  const normalized = path.posix.normalize(spec.replace(/^(\.\.\/)+/, ''));
+  const hostEntry = verifiedHostModules[normalized];
+  if (!hostEntry || typeof hostEntry.absPath !== 'string' || typeof hostEntry.codeHash !== 'string' || typeof hostEntry.fileUrl !== 'string') {
+    return null;
+  }
+  const actualHash = sha256(fs.readFileSync(hostEntry.absPath, 'utf8'));
+  if (actualHash !== hostEntry.codeHash) {
+    throw new Error(
+      `宿主模块哈希校验失败 (${normalized})：实际 ${actualHash} 与预期 ${hostEntry.codeHash} 不一致`,
+    );
+  }
+  return hostEntry.fileUrl;
+}
+
+function compileVerifiedModuleTree(
+  entryRelPath,
+  verifiedCode,
+  expectedCodeHash,
+  verifiedRelativeDeps,
+  verifiedHostModules,
+  label,
+) {
   if (typeof verifiedCode !== 'string' || typeof expectedCodeHash !== 'string') {
     throw new Error(`安全校验失败 (${label})：缺少 verifiedCode 或 expectedCodeHash，禁止从磁盘路径直接加载`);
   }
@@ -39,8 +66,67 @@ async function importVerifiedModule(verifiedCode, expectedCodeHash, baseImplPath
       `TOCTOU/哈希校验失败 (${label})：执行字节 SHA-256 (${actualHash}) 与预期 (${expectedCodeHash}) 不一致，拒绝执行`,
     );
   }
-  const executableCode = rewriteRelativeImports(verifiedCode, baseImplPath);
-  const dataUrl = `data:text/javascript;base64,${Buffer.from(executableCode, 'utf8').toString('base64')}`;
+
+  const depsMap = verifiedRelativeDeps && typeof verifiedRelativeDeps === 'object' ? verifiedRelativeDeps : {};
+  const memo = new Map();
+  const visiting = new Set();
+  const importRegex = /((?:(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?|import\s*\(\s*))(['"])(\.\.?\/[^'"]+)\2/g;
+
+  const compileModule = (relPath, codeText, expectedHash) => {
+    if (memo.has(relPath)) return memo.get(relPath);
+    if (visiting.has(relPath)) {
+      throw new Error(`循环相对依赖禁止执行 (${label})：检测到 ${relPath} 循环引用`);
+    }
+    const actual = sha256(codeText);
+    if (actual !== expectedHash) {
+      throw new Error(
+        `TOCTOU/相对依赖哈希校验失败 (${label}/${relPath})：实际 ${actual} 与预期 ${expectedHash} 不一致`,
+      );
+    }
+
+    visiting.add(relPath);
+    const rewritten = codeText.replace(importRegex, (_m, prefix, quote, spec) => {
+      const hostUrl = resolveDeclaredHostModuleUrl(spec, verifiedHostModules);
+      if (hostUrl) {
+        return `${prefix}${quote}${hostUrl}${quote}`;
+      }
+      const targetKey = resolveRelativeDepKey(relPath, spec);
+      const depEntry = depsMap[targetKey];
+      if (!depEntry || typeof depEntry.code !== 'string' || typeof depEntry.codeHash !== 'string') {
+        throw new Error(
+          `相对依赖未固定或不可用 (${label})：${relPath} 引用的 "${spec}" (${targetKey}) 不在已验证依赖清单中，禁止从磁盘读取`,
+        );
+      }
+      const depDataUrl = compileModule(targetKey, depEntry.code, depEntry.codeHash);
+      return `${prefix}${quote}${depDataUrl}${quote}`;
+    });
+    visiting.delete(relPath);
+
+    const dataUrl = `data:text/javascript;base64,${Buffer.from(rewritten, 'utf8').toString('base64')}`;
+    memo.set(relPath, dataUrl);
+    return dataUrl;
+  };
+
+  return compileModule(normalizePosix(entryRelPath || 'impl.mjs'), verifiedCode, expectedCodeHash);
+}
+
+async function importVerifiedModule(
+  verifiedCode,
+  expectedCodeHash,
+  baseImplPath,
+  verifiedRelativeDeps,
+  verifiedHostModules,
+  label,
+) {
+  const entryName = baseImplPath ? path.basename(baseImplPath) : 'impl.mjs';
+  const dataUrl = compileVerifiedModuleTree(
+    entryName,
+    verifiedCode,
+    expectedCodeHash,
+    verifiedRelativeDeps,
+    verifiedHostModules,
+    label,
+  );
   return await import(dataUrl);
 }
 
@@ -70,9 +156,13 @@ async function main() {
     implPath,
     verifiedCode,
     expectedCodeHash,
+    verifiedRelativeDeps,
+    verifiedHostModules,
     evalImplPath,
     evalVerifiedCode,
     expectedEvalCodeHash,
+    evalVerifiedRelativeDeps,
+    evalVerifiedHostModules,
     params,
     evalParams,
     solverId,
@@ -81,7 +171,14 @@ async function main() {
     initialSpec,
   } = payload;
 
-  const mod = await importVerifiedModule(verifiedCode, expectedCodeHash, implPath, 'primary');
+  const mod = await importVerifiedModule(
+    verifiedCode,
+    expectedCodeHash,
+    implPath,
+    verifiedRelativeDeps,
+    verifiedHostModules,
+    'primary',
+  );
 
   if (action === 'check') {
     if (typeof mod.selfCheck !== 'function') {
@@ -109,6 +206,8 @@ async function main() {
       evalVerifiedCode,
       expectedEvalCodeHash,
       evalImplPath,
+      evalVerifiedRelativeDeps,
+      evalVerifiedHostModules,
       'evaluator',
     );
     if (typeof evalMod.evaluate !== 'function') {

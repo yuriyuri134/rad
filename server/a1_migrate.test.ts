@@ -5,7 +5,12 @@ import path from 'node:path';
 import test from 'node:test';
 import { buildArchitectureMap } from '../src/core/architectureMap.ts';
 import { collectWorkspaceFiles } from './a0_audit.ts';
-import { migrateWorkspaceToStageA1 } from './a1_migrate.ts';
+import {
+  LEGACY_MIGRATION_MAPPING_SPEC,
+  migrateWorkspaceToStageA1,
+  recoverInterruptedMigrations,
+  SimulatedProcessCrashError,
+} from './a1_migrate.ts';
 import {
   canonicalJson,
   detectRuntimeEnvironment,
@@ -139,7 +144,32 @@ test('A1.2.1: staged migration enforces all constraints, preserves legacy files 
     assert.equal(run1.evaluations.length, 2);
     assert.equal(run1.standaloneAnalyses?.length, 2);
 
-    // 4. Verify ArchitectureMap parses migrated components & runs cleanly
+    // 4. Verify solidified migration manifest & snap-002-before independent root rule
+    const manifestPath = path.join(tmpWs, 'migration_a1_manifest.json');
+    assert.ok(fs.existsSync(manifestPath));
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    assert.equal(manifest.contractId, LEGACY_MIGRATION_MAPPING_SPEC.contractId);
+    assert.equal(manifest.spec.snapshots['snap-002-before'].rootKind, 'independent_root_node');
+    assert.equal(manifest.spec.snapshots['snap-002-before'].parentSnapshotId, null);
+    assert.equal(manifest.spec.snapshots['snap-002-before'].legacyParentRunId, 'run-001');
+    assert.deepEqual(manifest.migratedOutputs.branches, [
+      {
+        id: 'branch-main-singlet',
+        baseSnapshotId: 'snap-001',
+        headSnapshotId: 'snap-001',
+        adoptedRunIds: ['run-001'],
+        unadoptedRunIds: [],
+      },
+      {
+        id: 'branch-b-doublet',
+        baseSnapshotId: 'snap-002-before',
+        headSnapshotId: 'snap-002-before',
+        adoptedRunIds: [],
+        unadoptedRunIds: ['run-002'],
+      },
+    ]);
+
+    // 5. Verify ArchitectureMap parses migrated components & runs cleanly
     const map = buildArchitectureMap({
       rootDir: process.cwd(),
       components: listComponents(tmpWs),
@@ -148,7 +178,7 @@ test('A1.2.1: staged migration enforces all constraints, preserves legacy files 
     });
     assert.ok(map.nodes.length > 0);
 
-    // 5. Verify idempotency on repeat migration run
+    // 6. Verify idempotency on repeat migration run
     const stateBeforeRepeat = canonicalJson({
       ros: listResearchObjects(tmpWs),
       snaps: listSnapshots(tmpWs),
@@ -169,7 +199,7 @@ test('A1.2.1: staged migration enforces all constraints, preserves legacy files 
     });
     assert.equal(stateAfterRepeat, stateBeforeRepeat);
 
-    // 6. Verify subsequent append-only post-hoc supplement survives repeat migration without duplication
+    // 7. Verify subsequent append-only post-hoc supplement survives repeat migration without duplication
     updateRunEvaluations(
       'run-001',
       {
@@ -192,6 +222,60 @@ test('A1.2.1: staged migration enforces all constraints, preserves legacy files 
     migrateWorkspaceToStageA1(tmpWs);
     assert.equal(listRunSupplements(tmpWs).length, 6);
     assert.equal(listRuns(tmpWs).find((r) => r.id === 'run-001')!.evaluations.length, 3);
+  } finally {
+    fs.rmSync(tmpWs, { recursive: true, force: true });
+  }
+});
+
+test('A1.2.1: process crash mid-commit leaves journal.json(phase=committing) + partial files, and restart crash recovery restores pre-migration state', () => {
+  const tmpWs = clonePreMigrationWorkspace();
+  try {
+    const beforeSnapshot = collectWorkspaceFiles(tmpWs).map((f) => ({
+      path: f.relativePath,
+      sha256: f.sha256,
+      bytes: f.bytes,
+    }));
+
+    // Simulate SIGKILL mid-commit (after 5 files written, catch rollback bypassed)
+    let caughtCrash: unknown;
+    try {
+      migrateWorkspaceToStageA1(tmpWs, { simulateCrashWithoutRollbackAfterFiles: 5 });
+    } catch (err) {
+      caughtCrash = err;
+    }
+    assert.ok(caughtCrash instanceof SimulatedProcessCrashError);
+
+    // Confirm half-committed state & persistent journal remain on disk
+    assert.equal(fs.existsSync(path.join(tmpWs, 'research_objects.json')), true);
+    assert.equal(fs.existsSync(path.join(tmpWs, 'snapshots.jsonl')), true);
+    const migTmpDir = path.join(tmpWs, '.migration_tmp');
+    assert.equal(fs.existsSync(migTmpDir), true);
+    const stageDirs = fs.readdirSync(migTmpDir);
+    assert.equal(stageDirs.length, 1);
+    const journal = JSON.parse(
+      fs.readFileSync(path.join(migTmpDir, stageDirs[0], 'journal.json'), 'utf8'),
+    );
+    assert.equal(journal.phase, 'committing');
+
+    // Simulate process restart calling recoverInterruptedMigrations(tmpWs)
+    const recoveries = recoverInterruptedMigrations(tmpWs);
+    assert.equal(recoveries.length, 1);
+    assert.equal(recoveries[0].phaseAtCrash, 'committing');
+    assert.equal(recoveries[0].action, 'rolled_back_after_crash');
+    assert.ok(recoveries[0].removedCount >= 5);
+
+    const afterRecoverySnapshot = collectWorkspaceFiles(tmpWs).map((f) => ({
+      path: f.relativePath,
+      sha256: f.sha256,
+      bytes: f.bytes,
+    }));
+    assert.deepEqual(afterRecoverySnapshot, beforeSnapshot);
+    assert.equal(fs.existsSync(migTmpDir), false);
+
+    // Re-running full migration after crash recovery must succeed cleanly
+    const cleanResult = migrateWorkspaceToStageA1(tmpWs);
+    assert.equal(cleanResult.success, true);
+    assert.equal(cleanResult.correspondence.snap002BeforeParentNull, true);
   } finally {
     fs.rmSync(tmpWs, { recursive: true, force: true });
   }

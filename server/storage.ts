@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { traceOpticalSystem } from '../src/core/optics.ts';
 import type {
   ActorAttribution,
@@ -15,6 +16,7 @@ import type {
   ExperimentSnapshot,
   HistoricalHashDriftRecord,
   OpticalSystemSpec,
+  PinnedRelativeDep,
   ResearchObject,
   ResearchSnapshot,
   RunSupplement,
@@ -92,19 +94,146 @@ export function writeCasBlob(codeContent: string, workspaceDir?: string): string
   return hash;
 }
 
-export function readCasBlob(expectedHash: string, workspaceDir?: string): string | null {
-  if (!/^[a-f0-9]{64}$/.test(expectedHash)) return null;
+export function inspectCasBlob(
+  expectedHash: string | null | undefined,
+  workspaceDir?: string,
+): {
+  status: 'valid' | 'missing' | 'corrupted' | 'unpinned';
+  content: string | null;
+  actualHash: string | null;
+} {
+  if (!expectedHash || !/^[a-f0-9]{64}$/.test(expectedHash)) {
+    return { status: 'unpinned', content: null, actualHash: null };
+  }
   const { immutableStoreDir } = getWorkspacePaths(workspaceDir);
   const blobPath = path.join(immutableStoreDir, expectedHash);
-  if (!fs.existsSync(blobPath)) return null;
+  if (!fs.existsSync(blobPath)) {
+    return { status: 'missing', content: null, actualHash: null };
+  }
   const content = fs.readFileSync(blobPath, 'utf8');
   const actualHash = sha256(content);
   if (actualHash !== expectedHash) {
+    return { status: 'corrupted', content: null, actualHash };
+  }
+  return { status: 'valid', content, actualHash };
+}
+
+export function readCasBlob(expectedHash: string, workspaceDir?: string): string | null {
+  const inspected = inspectCasBlob(expectedHash, workspaceDir);
+  if (inspected.status === 'corrupted') {
     throw new Error(
-      `CAS 不可变存储完整性校验失败：blob ${expectedHash} 实际哈希为 ${actualHash}`,
+      `CAS 不可变存储完整性校验失败：blob ${expectedHash} 实际哈希为 ${inspected.actualHash}`,
     );
   }
-  return content;
+  return inspected.status === 'valid' ? inspected.content : null;
+}
+
+const RELATIVE_IMPORT_REGEX =
+  /(?:(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?|import\s*\(\s*)(['"])(\.\.?\/[^'"]+)\1/g;
+
+export function extractRelativeImportSpecifiers(code: string): string[] {
+  const specs: string[] = [];
+  const regex = new RegExp(RELATIVE_IMPORT_REGEX.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(code)) !== null) {
+    if (!specs.includes(m[2])) {
+      specs.push(m[2]);
+    }
+  }
+  return specs;
+}
+
+export function resolveAllowedHostModuleImport(
+  spec: string,
+  dependencies: ComponentDossier['dependencies'] | undefined,
+  repoRoot = process.cwd(),
+): { targetId: string; absPath: string; fileUrl: string; codeHash: string } | null {
+  if (!spec.startsWith('../')) return null;
+  const normalized = path.posix.normalize(spec.replace(/^(\.\.\/)+/, ''));
+  if (!normalized.startsWith('src/core/')) return null;
+
+  const declared = (dependencies ?? []).some((d) => {
+    if (typeof d === 'string') return d === normalized;
+    return d.kind === 'module' && d.targetId === normalized;
+  });
+  if (!declared) return null;
+
+  const absRoot = path.resolve(repoRoot);
+  const absTarget = path.resolve(absRoot, normalized);
+  const rel = path.relative(absRoot, absTarget).replace(/\\/g, '/');
+  if (rel !== normalized || !fs.existsSync(absTarget) || fs.statSync(absTarget).isDirectory()) {
+    return null;
+  }
+
+  return {
+    targetId: normalized,
+    absPath: absTarget,
+    fileUrl: pathToFileURL(absTarget).href,
+    codeHash: sha256(fs.readFileSync(absTarget, 'utf8')),
+  };
+}
+
+export function discoverLocalRelativeDependencies(
+  versionDir: string,
+  entryFile: string,
+  dependencies?: ComponentDossier['dependencies'],
+  repoRoot = process.cwd(),
+): Array<{ relativePath: string; codeContent: string; codeHash: string }> {
+  const resolvedRoot = path.resolve(versionDir);
+  const entryAbs = path.resolve(resolvedRoot, entryFile);
+  if (!fs.existsSync(entryAbs)) {
+    return [];
+  }
+
+  const visited = new Set<string>();
+  const queue: string[] = [entryAbs];
+  const deps: Array<{ relativePath: string; codeContent: string; codeHash: string }> = [];
+
+  while (queue.length > 0) {
+    const currentAbs = queue.shift()!;
+    if (visited.has(currentAbs)) continue;
+    visited.add(currentAbs);
+
+    const code = fs.readFileSync(currentAbs, 'utf8');
+    const currentRel = path.relative(resolvedRoot, currentAbs).replace(/\\/g, '/');
+    if (currentAbs !== entryAbs) {
+      deps.push({
+        relativePath: currentRel,
+        codeContent: code,
+        codeHash: sha256(code),
+      });
+    }
+
+    if (/\.(mjs|js|ts|mts)$/i.test(currentAbs)) {
+      const specs = extractRelativeImportSpecifiers(code);
+      for (const spec of specs) {
+        const targetAbs = path.resolve(path.dirname(currentAbs), spec);
+        const relFromRoot = path.relative(resolvedRoot, targetAbs);
+        if (
+          relFromRoot.startsWith('..') ||
+          path.isAbsolute(relFromRoot) ||
+          relFromRoot === ''
+        ) {
+          if (resolveAllowedHostModuleImport(spec, dependencies, repoRoot)) {
+            continue;
+          }
+          throw new Error(
+            `组件相对依赖越界：${currentRel} 引用了 "${spec}"，禁止使用 ../ 逃逸组件版本目录 (${resolvedRoot})`,
+          );
+        }
+        if (!fs.existsSync(targetAbs) || fs.statSync(targetAbs).isDirectory()) {
+          throw new Error(
+            `组件相对依赖缺失：${currentRel} 引用的 "${spec}" 在版本目录中不存在`,
+          );
+        }
+        if (!visited.has(targetAbs)) {
+          queue.push(targetAbs);
+        }
+      }
+    }
+  }
+
+  return deps.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 
 export function canonicalJson(value: unknown): string {
@@ -1412,21 +1541,51 @@ function hydrateDossierLiveState(
     const frozenBySnapshotIds = Array.from(new Set([...(v.frozenBySnapshotIds ?? []), ...refs.snapshotIds]));
 
     const immutableBlobHash = v.immutableBlobHash ?? null;
-    let casAvailable = false;
-    if (immutableBlobHash && /^[a-f0-9]{64}$/.test(immutableBlobHash)) {
-      const blobPath = path.join(immutableStoreDir, immutableBlobHash);
-      if (fs.existsSync(blobPath)) {
-        try {
-          casAvailable = sha256(fs.readFileSync(blobPath, 'utf8')) === immutableBlobHash;
-        } catch {
+    const versionDir = path.join(compDir, v.version);
+    const casWsDir = path.resolve(immutableStoreDir, '..', '..');
+    const primaryCas = inspectCasBlob(immutableBlobHash, casWsDir);
+
+    let casIntegrityStatus: ComponentVersionRecord['casIntegrityStatus'] = primaryCas.status;
+    let casTamperDetected = primaryCas.status === 'corrupted';
+    let casAvailable = primaryCas.status === 'valid';
+
+    let relativeDepsWorkspaceModified = false;
+    for (const dep of v.pinnedRelativeDeps ?? []) {
+      const depPath = path.join(versionDir, dep.relativePath);
+      const expectedDepHash = dep.immutableBlobHash || dep.codeHash;
+      if (!fs.existsSync(depPath)) {
+        relativeDepsWorkspaceModified = true;
+      } else {
+        const depDiskHash = sha256(fs.readFileSync(depPath, 'utf8'));
+        if (depDiskHash !== expectedDepHash) {
+          relativeDepsWorkspaceModified = true;
+        }
+      }
+      if (dep.immutableBlobHash) {
+        const depCas = inspectCasBlob(dep.immutableBlobHash, casWsDir);
+        if (depCas.status === 'corrupted') {
+          casTamperDetected = true;
           casAvailable = false;
+          casIntegrityStatus = 'corrupted';
+        } else if (depCas.status !== 'valid') {
+          casAvailable = false;
+          if (casIntegrityStatus === 'valid') {
+            casIntegrityStatus = depCas.status;
+          }
+        }
+      } else if (lifecycle === 'frozen') {
+        casAvailable = false;
+        if (casIntegrityStatus === 'valid') {
+          casIntegrityStatus = 'unpinned';
         }
       }
     }
 
     const expectedFrozenHash = immutableBlobHash || v.codeHash;
     const workspaceMatchesFrozenHash =
-      lifecycle === 'frozen' ? Boolean(existsOnDisk && diskHash === expectedFrozenHash) : undefined;
+      lifecycle === 'frozen'
+        ? Boolean(existsOnDisk && diskHash === expectedFrozenHash && !relativeDepsWorkspaceModified)
+        : undefined;
     const frozenWorkspaceModified = lifecycle === 'frozen' ? !workspaceMatchesFrozenHash : false;
 
     return {
@@ -1437,9 +1596,12 @@ function hydrateDossierLiveState(
       frozenBySnapshotIds,
       sourceAvailability,
       immutableBlobHash,
+      casIntegrityStatus,
+      casTamperDetected,
       casAvailable,
       workspaceMatchesFrozenHash,
       frozenWorkspaceModified,
+      relativeDepsWorkspaceModified,
       historicalDriftedHashes: driftedRecords.length > 0 ? driftedRecords : v.historicalDriftedHashes,
     };
   });
@@ -1485,6 +1647,7 @@ function hydrateDossierLiveState(
   const frozenDriftDetected = hydratedVersions.some(
     (v) => v.lifecycle === 'frozen' && v.frozenWorkspaceModified === true,
   );
+  const casTamperDetected = hydratedVersions.some((v) => v.casTamperDetected === true);
 
   if (activeRec) {
     const codePath = path.join(compDir, activeRec.version, activeRec.codeFile);
@@ -1497,7 +1660,8 @@ function hydrateDossierLiveState(
       );
       const mismatchVersionHash = Boolean(activeRec.codeHash && diskActualHash !== activeRec.codeHash);
       const mismatchFrozen = Boolean(activeRec.lifecycle === 'frozen' && activeRec.frozenWorkspaceModified);
-      if (mismatchApproved || mismatchVersionHash || mismatchFrozen) {
+      const mismatchDeps = Boolean(activeRec.relativeDepsWorkspaceModified);
+      if (mismatchApproved || mismatchVersionHash || mismatchFrozen || mismatchDeps) {
         diskTamperDetected = true;
       }
     } else {
@@ -1540,6 +1704,7 @@ function hydrateDossierLiveState(
     selfCheck,
     diskTamperDetected,
     frozenDriftDetected,
+    casTamperDetected,
     diskActualHash,
     impactScope: {
       dependentComponentIds,
@@ -1591,9 +1756,9 @@ export function getComponent(
   const codeByVersion: Record<string, string> = {};
   for (const ver of hydrated.versions) {
     if (ver.lifecycle === 'frozen' && ver.immutableBlobHash) {
-      const casText = readCasBlob(ver.immutableBlobHash, workspaceDir);
-      if (casText !== null) {
-        codeByVersion[ver.version] = casText;
+      const casInspected = inspectCasBlob(ver.immutableBlobHash, workspaceDir);
+      if (casInspected.status === 'valid' && casInspected.content !== null) {
+        codeByVersion[ver.version] = casInspected.content;
         continue;
       }
     }
@@ -1612,13 +1777,17 @@ export function saveComponentDossier(dossier: ComponentDossier, workspaceDir?: s
   const cleanDossier: ComponentDossier = { ...dossier };
   delete cleanDossier.diskTamperDetected;
   delete cleanDossier.frozenDriftDetected;
+  delete cleanDossier.casTamperDetected;
   delete cleanDossier.diskActualHash;
   delete cleanDossier.impactScope;
   cleanDossier.versions = (cleanDossier.versions ?? []).map((v) => {
     const copy = { ...v };
+    delete copy.casIntegrityStatus;
+    delete copy.casTamperDetected;
     delete copy.casAvailable;
     delete copy.workspaceMatchesFrozenHash;
     delete copy.frozenWorkspaceModified;
+    delete copy.relativeDepsWorkspaceModified;
     return copy;
   });
   const dossierPath = path.join(paths.componentsDir, safeId, 'dossier.json');
@@ -1796,7 +1965,8 @@ export function freezeComponentVersion(
   if (!ver) throw new Error(`未找到版本 ${componentId}@${version}`);
 
   const { componentsDir } = getWorkspacePaths(workspaceDir);
-  const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
+  const versionDir = path.join(componentsDir, path.basename(componentId), ver.version);
+  const codePath = path.join(versionDir, ver.codeFile);
   const existsOnDisk = fs.existsSync(codePath);
 
   if (!ver.immutableBlobHash && existsOnDisk) {
@@ -1806,6 +1976,33 @@ export function freezeComponentVersion(
     }
   } else if (ver.immutableBlobHash) {
     readCasBlob(ver.immutableBlobHash, workspaceDir);
+  }
+
+  if (existsOnDisk && ver.immutableBlobHash) {
+    const discovered = discoverLocalRelativeDependencies(versionDir, ver.codeFile, rawDossier.dependencies);
+    if (ver.pinnedRelativeDeps && ver.pinnedRelativeDeps.length > 0) {
+      ver.pinnedRelativeDeps = ver.pinnedRelativeDeps.map((dep) => {
+        if (dep.immutableBlobHash) {
+          readCasBlob(dep.immutableBlobHash, workspaceDir);
+          return dep;
+        }
+        const match = discovered.find((d) => d.relativePath === dep.relativePath);
+        if (match && match.codeHash === dep.codeHash) {
+          return {
+            relativePath: dep.relativePath,
+            codeHash: dep.codeHash,
+            immutableBlobHash: writeCasBlob(match.codeContent, workspaceDir),
+          };
+        }
+        return dep;
+      });
+    } else if (discovered.length > 0) {
+      ver.pinnedRelativeDeps = discovered.map((d) => ({
+        relativePath: d.relativePath,
+        codeHash: d.codeHash,
+        immutableBlobHash: writeCasBlob(d.codeContent, workspaceDir),
+      }));
+    }
   }
 
   ver.lifecycle = 'frozen';
@@ -1836,6 +2033,7 @@ export function readFrozenComponentSource(
   source: 'cas' | 'workspace';
   workspaceMatchesFrozenHash: boolean;
   frozenWorkspaceModified: boolean;
+  relativeDeps: Array<{ relativePath: string; codeContent: string; codeHash: string }>;
 } {
   const found = getComponent(componentId, workspaceDir);
   if (!found) throw new Error(`未找到组件 ${componentId}`);
@@ -1844,32 +2042,68 @@ export function readFrozenComponentSource(
   if (!ver) throw new Error(`未找到版本 ${componentId}@${version}`);
 
   const { componentsDir } = getWorkspacePaths(workspaceDir);
-  const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
+  const versionDir = path.join(componentsDir, path.basename(componentId), ver.version);
+  const codePath = path.join(versionDir, ver.codeFile);
   const existsOnDisk = fs.existsSync(codePath);
   const diskContent = existsOnDisk ? fs.readFileSync(codePath, 'utf8') : null;
   const diskHash = diskContent !== null ? sha256(diskContent) : null;
 
+  const relativeDeps: Array<{ relativePath: string; codeContent: string; codeHash: string }> = [];
+  let allDepsMatchWorkspace = true;
+  for (const dep of ver.pinnedRelativeDeps ?? []) {
+    const depDiskPath = path.join(versionDir, dep.relativePath);
+    const depDiskExists = fs.existsSync(depDiskPath);
+    const depDiskContent = depDiskExists ? fs.readFileSync(depDiskPath, 'utf8') : null;
+    const depDiskHash = depDiskContent !== null ? sha256(depDiskContent) : null;
+    if (!depDiskExists || depDiskHash !== (dep.immutableBlobHash || dep.codeHash)) {
+      allDepsMatchWorkspace = false;
+    }
+    if (dep.immutableBlobHash) {
+      const casDepContent = readCasBlob(dep.immutableBlobHash, workspaceDir);
+      if (casDepContent === null) {
+        if (depDiskContent !== null && depDiskHash === dep.codeHash) {
+          relativeDeps.push({ relativePath: dep.relativePath, codeContent: depDiskContent, codeHash: dep.codeHash });
+        } else {
+          throw new Error(`CAS 缺失相对依赖 ${componentId}@${version}/${dep.relativePath} (${dep.immutableBlobHash})`);
+        }
+      } else {
+        relativeDeps.push({ relativePath: dep.relativePath, codeContent: casDepContent, codeHash: dep.immutableBlobHash });
+      }
+    } else if (depDiskContent !== null && depDiskHash === dep.codeHash) {
+      relativeDeps.push({ relativePath: dep.relativePath, codeContent: depDiskContent, codeHash: dep.codeHash });
+    } else {
+      throw new Error(`相对依赖 ${componentId}@${version}/${dep.relativePath} 不可用或哈希不匹配`);
+    }
+  }
+
   if (ver.immutableBlobHash) {
     const casContent = readCasBlob(ver.immutableBlobHash, workspaceDir);
     if (casContent !== null) {
-      const matches = Boolean(existsOnDisk && diskHash === ver.immutableBlobHash);
+      const matches = Boolean(existsOnDisk && diskHash === ver.immutableBlobHash && allDepsMatchWorkspace);
       return {
         codeContent: casContent,
         codeHash: ver.immutableBlobHash,
         source: 'cas',
         workspaceMatchesFrozenHash: matches,
         frozenWorkspaceModified: !matches,
+        relativeDeps,
       };
     }
   }
 
-  if (diskContent !== null && diskHash === ver.codeHash && ver.sourceAvailability !== 'missing_on_disk') {
+  if (
+    diskContent !== null &&
+    diskHash === ver.codeHash &&
+    ver.sourceAvailability !== 'missing_on_disk' &&
+    allDepsMatchWorkspace
+  ) {
     return {
       codeContent: diskContent,
       codeHash: ver.codeHash,
       source: 'workspace',
       workspaceMatchesFrozenHash: true,
       frozenWorkspaceModified: false,
+      relativeDeps,
     };
   }
 
@@ -1885,6 +2119,7 @@ export function restoreFrozenComponentWorkspaceFile(
   dossier: ComponentDossier;
   restoredFromCasHash: string;
   preservedDraftVersion: string | null;
+  restoredRelativePaths: string[];
 } {
   const rawBefore = getRawDossier(componentId, workspaceDir);
   const hydratedBefore = getComponent(componentId, workspaceDir);
@@ -1900,8 +2135,21 @@ export function restoreFrozenComponentWorkspaceFile(
     throw new Error(`CAS 中未找到 ${componentId}@${version} 的不可变源码 (${ver.immutableBlobHash})`);
   }
 
+  const casRelativeContents: Array<{ relativePath: string; content: string }> = [];
+  for (const dep of ver.pinnedRelativeDeps ?? []) {
+    if (!dep.immutableBlobHash) {
+      throw new Error(`CAS 中未记录相对依赖 ${componentId}@${version}/${dep.relativePath} 的不可变哈希`);
+    }
+    const depCas = readCasBlob(dep.immutableBlobHash, workspaceDir);
+    if (depCas === null) {
+      throw new Error(`CAS 中未找到相对依赖 ${componentId}@${version}/${dep.relativePath} (${dep.immutableBlobHash})`);
+    }
+    casRelativeContents.push({ relativePath: dep.relativePath, content: depCas });
+  }
+
   const { componentsDir } = getWorkspacePaths(workspaceDir);
-  const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
+  const versionDir = path.join(componentsDir, path.basename(componentId), ver.version);
+  const codePath = path.join(versionDir, ver.codeFile);
   const preserveEdit = options?.preserveWorkspaceEditAsDraft ?? true;
   let preservedDraftVersion: string | null = null;
 
@@ -1939,6 +2187,14 @@ export function restoreFrozenComponentWorkspaceFile(
   fs.mkdirSync(path.dirname(codePath), { recursive: true });
   atomicWriteFileSync(codePath, casContent);
 
+  const restoredRelativePaths: string[] = [];
+  for (const dep of casRelativeContents) {
+    const depPath = path.join(versionDir, dep.relativePath);
+    fs.mkdirSync(path.dirname(depPath), { recursive: true });
+    atomicWriteFileSync(depPath, dep.content);
+    restoredRelativePaths.push(dep.relativePath);
+  }
+
   if (preservedDraftVersion) {
     const updatedRaw = getRawDossier(componentId, workspaceDir)!;
     updatedRaw.activeVersion = prevActiveVersion;
@@ -1951,6 +2207,7 @@ export function restoreFrozenComponentWorkspaceFile(
     dossier: getComponent(componentId, workspaceDir)!.dossier,
     restoredFromCasHash: ver.immutableBlobHash,
     preservedDraftVersion,
+    restoredRelativePaths,
   };
 }
 
@@ -1966,16 +2223,40 @@ export function approveComponentVersion(
   if (!ver) throw new Error(`未找到版本 ${version}`);
 
   const { componentsDir } = getWorkspacePaths(workspaceDir);
-  const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
+  const versionDir = path.join(componentsDir, path.basename(componentId), ver.version);
+  const codePath = path.join(versionDir, ver.codeFile);
   if (!fs.existsSync(codePath)) {
     throw new Error(`组件 ${componentId}@${version} 源码文件在磁盘缺失，无法核准授权`);
   }
   const actualDiskText = fs.readFileSync(codePath, 'utf8');
   const actualDiskHash = sha256(actualDiskText);
-  if (ver.lifecycle === 'frozen' && ver.codeHash !== actualDiskHash) {
-    throw new Error(
-      `冻结版本 ${componentId}@${version} 禁止通过授权改写原记录哈希 (${ver.codeHash.slice(0, 12)}... != ${actualDiskHash.slice(0, 12)}...)，请派生新 Draft 版本。`,
-    );
+  const discoveredDeps = discoverLocalRelativeDependencies(versionDir, ver.codeFile, found.dossier.dependencies);
+
+  if (ver.lifecycle === 'frozen') {
+    if (ver.codeHash !== actualDiskHash) {
+      throw new Error(
+        `冻结版本 ${componentId}@${version} 禁止通过授权改写原记录哈希 (${ver.codeHash.slice(0, 12)}... != ${actualDiskHash.slice(0, 12)}...)，请派生新 Draft 版本。`,
+      );
+    }
+    const existingDeps = ver.pinnedRelativeDeps ?? [];
+    const depsChanged =
+      existingDeps.length !== discoveredDeps.length ||
+      existingDeps.some((d, i) => {
+        const cur = discoveredDeps[i];
+        return !cur || cur.relativePath !== d.relativePath || cur.codeHash !== d.codeHash;
+      });
+    if (depsChanged) {
+      throw new Error(`冻结版本 ${componentId}@${version} 的相对依赖文件已被修改，禁止直接覆盖授权，请派生新 Draft 版本。`);
+    }
+  } else {
+    ver.pinnedRelativeDeps =
+      discoveredDeps.length > 0
+        ? discoveredDeps.map((d) => ({
+            relativePath: d.relativePath,
+            codeHash: d.codeHash,
+            immutableBlobHash: null,
+          }))
+        : undefined;
   }
   ver.codeHash = actualDiskHash;
 
