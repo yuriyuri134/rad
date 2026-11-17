@@ -1,0 +1,564 @@
+{
+  "verifiedAt": "2026-11-17T03:26:48Z",
+  "verifier": "Independent Pure-NumPy 3D Vector Snell + Schott Sellmeier Checker (Zero Optiland Imports)",
+  "allPassed": true,
+  "rounds": [
+    {
+      "roundId": "A0",
+      "indepEflMm": 100.0,
+      "optilandEflMm": 100.0,
+      "eflDiffMm": -0.0,
+      "indepParaxialBflMm": 98.67262,
+      "optilandParaxialBflMm": 98.67262,
+      "bflDiffMm": 0.0,
+      "indepChromFcMm": -1.53549,
+      "optilandChromFcMm": -1.53549,
+      "chromDiffMm": 0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 2.0821
+      },
+      "indepOverallPolyRmsUm": 219.385,
+      "optilandOverallPolyRmsUm": 219.385,
+      "overallRmsDiffUm": -0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 217.662,
+          "optilandPolyRmsUm": 217.662,
+          "rmsDiffUm": 0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.872685,
+          "optilandChiefYmm": 0.872685,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 218.692,
+          "optilandPolyRmsUm": 218.692,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.745492,
+          "optilandChiefYmm": 1.745492,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 221.78,
+          "optilandPolyRmsUm": 221.78,
+          "rmsDiffUm": 0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "A1",
+      "indepEflMm": 100.0,
+      "optilandEflMm": 100.0,
+      "eflDiffMm": 0.0,
+      "indepParaxialBflMm": 97.69921,
+      "optilandParaxialBflMm": 97.69921,
+      "bflDiffMm": -0.0,
+      "indepChromFcMm": -1.53406,
+      "optilandChromFcMm": -1.53406,
+      "chromDiffMm": 0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 2.0742
+      },
+      "indepOverallPolyRmsUm": 153.49,
+      "optilandOverallPolyRmsUm": 153.49,
+      "overallRmsDiffUm": 0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 152.076,
+          "optilandPolyRmsUm": 152.076,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.872686,
+          "optilandChiefYmm": 0.872686,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 152.918,
+          "optilandPolyRmsUm": 152.918,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.7455,
+          "optilandChiefYmm": 1.7455,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 155.456,
+          "optilandPolyRmsUm": 155.456,
+          "rmsDiffUm": 0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "A2",
+      "indepEflMm": 100.0,
+      "optilandEflMm": 100.0,
+      "eflDiffMm": 0.0,
+      "indepParaxialBflMm": 97.40285,
+      "optilandParaxialBflMm": 97.40285,
+      "bflDiffMm": 0.0,
+      "indepChromFcMm": -1.53218,
+      "optilandChromFcMm": -1.53218,
+      "chromDiffMm": 0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 2.5733
+      },
+      "indepOverallPolyRmsUm": 72.739,
+      "optilandOverallPolyRmsUm": 72.739,
+      "overallRmsDiffUm": 0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 72.807,
+          "optilandPolyRmsUm": 72.807,
+          "rmsDiffUm": 0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.860045,
+          "optilandChiefYmm": 0.860045,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 72.75,
+          "optilandPolyRmsUm": 72.75,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.720216,
+          "optilandChiefYmm": 1.720216,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 72.661,
+          "optilandPolyRmsUm": 72.661,
+          "rmsDiffUm": -0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "A3",
+      "indepEflMm": 99.90222,
+      "optilandEflMm": 99.90222,
+      "eflDiffMm": 0.0,
+      "indepParaxialBflMm": 97.31958,
+      "optilandParaxialBflMm": 97.31958,
+      "bflDiffMm": 0.0,
+      "indepChromFcMm": -1.53063,
+      "optilandChromFcMm": -1.53063,
+      "chromDiffMm": -0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 2.5716
+      },
+      "indepOverallPolyRmsUm": 74.592,
+      "optilandOverallPolyRmsUm": 74.592,
+      "overallRmsDiffUm": -0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 74.227,
+          "optilandPolyRmsUm": 74.227,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.861048,
+          "optilandChiefYmm": 0.861048,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 74.43,
+          "optilandPolyRmsUm": 74.43,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.722222,
+          "optilandChiefYmm": 1.722222,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 75.116,
+          "optilandPolyRmsUm": 75.116,
+          "rmsDiffUm": 0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "B0",
+      "indepEflMm": 98.32576,
+      "optilandEflMm": 98.32576,
+      "eflDiffMm": -0.0,
+      "indepParaxialBflMm": 91.27922,
+      "optilandParaxialBflMm": 91.27922,
+      "bflDiffMm": -0.0,
+      "indepChromFcMm": -0.14775,
+      "optilandChromFcMm": -0.14775,
+      "chromDiffMm": 0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 1.4942,
+        "s2_s3": 5.1141
+      },
+      "indepOverallPolyRmsUm": 87.777,
+      "optilandOverallPolyRmsUm": 87.776,
+      "overallRmsDiffUm": 0.001,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 85.275,
+          "optilandPolyRmsUm": 85.275,
+          "rmsDiffUm": 0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.858076,
+          "optilandChiefYmm": 0.858076,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 86.769,
+          "optilandPolyRmsUm": 86.768,
+          "rmsDiffUm": 0.001
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.716283,
+          "optilandChiefYmm": 1.716283,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 91.179,
+          "optilandPolyRmsUm": 91.179,
+          "rmsDiffUm": -0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "B1",
+      "indepEflMm": 98.32576,
+      "optilandEflMm": 98.32576,
+      "eflDiffMm": -0.0,
+      "indepParaxialBflMm": 91.27922,
+      "optilandParaxialBflMm": 91.27922,
+      "bflDiffMm": -0.0,
+      "indepChromFcMm": -0.14775,
+      "optilandChromFcMm": -0.14775,
+      "chromDiffMm": 0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 1.4942,
+        "s2_s3": 5.1141
+      },
+      "indepOverallPolyRmsUm": 87.777,
+      "optilandOverallPolyRmsUm": 87.776,
+      "overallRmsDiffUm": 0.001,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 85.275,
+          "optilandPolyRmsUm": 85.275,
+          "rmsDiffUm": 0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.858076,
+          "optilandChiefYmm": 0.858076,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 86.769,
+          "optilandPolyRmsUm": 86.768,
+          "rmsDiffUm": 0.001
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.716283,
+          "optilandChiefYmm": 1.716283,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 91.179,
+          "optilandPolyRmsUm": 91.179,
+          "rmsDiffUm": -0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "B1_retry",
+      "indepEflMm": 100.00058,
+      "optilandEflMm": 100.00058,
+      "eflDiffMm": -0.0,
+      "indepParaxialBflMm": 92.17154,
+      "optilandParaxialBflMm": 92.17154,
+      "bflDiffMm": 0.0,
+      "indepChromFcMm": -0.00015,
+      "optilandChromFcMm": -0.00015,
+      "chromDiffMm": -0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 2.052,
+        "s2_s3": 5.3503
+      },
+      "indepOverallPolyRmsUm": 21.234,
+      "optilandOverallPolyRmsUm": 21.234,
+      "overallRmsDiffUm": -0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 16.625,
+          "optilandPolyRmsUm": 16.625,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.868007,
+          "optilandChiefYmm": 0.868007,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 19.45,
+          "optilandPolyRmsUm": 19.45,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.736148,
+          "optilandChiefYmm": 1.736148,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 26.419,
+          "optilandPolyRmsUm": 26.419,
+          "rmsDiffUm": 0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "B2",
+      "indepEflMm": 100.0,
+      "optilandEflMm": 100.0,
+      "eflDiffMm": 0.0,
+      "indepParaxialBflMm": 93.96994,
+      "optilandParaxialBflMm": 93.96994,
+      "bflDiffMm": -0.0,
+      "indepChromFcMm": -0.00042,
+      "optilandChromFcMm": -0.00042,
+      "chromDiffMm": 0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 1.9875,
+        "s2_s3": 4.5974
+      },
+      "indepOverallPolyRmsUm": 14.957,
+      "optilandOverallPolyRmsUm": 14.957,
+      "overallRmsDiffUm": -0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 12.582,
+          "optilandPolyRmsUm": 12.581,
+          "rmsDiffUm": 0.001
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.869427,
+          "optilandChiefYmm": 0.869427,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 13.963,
+          "optilandPolyRmsUm": 13.963,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.73898,
+          "optilandChiefYmm": 1.738981,
+          "chiefDiffUm": -0.001,
+          "indepPolyRmsUm": 17.828,
+          "optilandPolyRmsUm": 17.828,
+          "rmsDiffUm": 0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "B2_refined",
+      "indepEflMm": 99.99977,
+      "optilandEflMm": 99.99977,
+      "eflDiffMm": 0.0,
+      "indepParaxialBflMm": 93.97165,
+      "optilandParaxialBflMm": 93.97165,
+      "bflDiffMm": -0.0,
+      "indepChromFcMm": 0.00887,
+      "optilandChromFcMm": 0.00887,
+      "chromDiffMm": -0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 1.9743,
+        "s2_s3": 4.6077
+      },
+      "indepOverallPolyRmsUm": 14.659,
+      "optilandOverallPolyRmsUm": 14.659,
+      "overallRmsDiffUm": -0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 12.191,
+          "optilandPolyRmsUm": 12.191,
+          "rmsDiffUm": 0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.869608,
+          "optilandChiefYmm": 0.869608,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 13.631,
+          "optilandPolyRmsUm": 13.631,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.739343,
+          "optilandChiefYmm": 1.739343,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 17.613,
+          "optilandPolyRmsUm": 17.613,
+          "rmsDiffUm": 0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "B3",
+      "indepEflMm": 100.00024,
+      "optilandEflMm": 100.00024,
+      "eflDiffMm": 0.0,
+      "indepParaxialBflMm": 95.41156,
+      "optilandParaxialBflMm": 95.41156,
+      "bflDiffMm": 0.0,
+      "indepChromFcMm": 0.00569,
+      "optilandChromFcMm": 0.00569,
+      "chromDiffMm": -0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 2.7251,
+        "s2_s3": 3.8844
+      },
+      "indepOverallPolyRmsUm": 19.978,
+      "optilandOverallPolyRmsUm": 19.978,
+      "overallRmsDiffUm": -0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 19.974,
+          "optilandPolyRmsUm": 19.974,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.867515,
+          "optilandChiefYmm": 0.867515,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 19.916,
+          "optilandPolyRmsUm": 19.916,
+          "rmsDiffUm": 0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.735149,
+          "optilandChiefYmm": 1.735149,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 20.043,
+          "optilandPolyRmsUm": 20.043,
+          "rmsDiffUm": -0.0
+        }
+      ],
+      "verificationPassed": true
+    },
+    {
+      "roundId": "C1",
+      "indepEflMm": 99.99977,
+      "optilandEflMm": 99.99977,
+      "eflDiffMm": 0.0,
+      "indepParaxialBflMm": 93.97165,
+      "optilandParaxialBflMm": 93.97165,
+      "bflDiffMm": -0.0,
+      "indepChromFcMm": 0.00887,
+      "optilandChromFcMm": 0.00887,
+      "chromDiffMm": -0.0,
+      "indepEdgeThicknessMm": {
+        "s1_s2": 1.9743,
+        "s2_s3": 4.6077
+      },
+      "indepOverallPolyRmsUm": 36.134,
+      "optilandOverallPolyRmsUm": 36.134,
+      "overallRmsDiffUm": -0.0,
+      "indepClipped": 0,
+      "indepTir": 0,
+      "fieldChecks": [
+        {
+          "fieldDeg": 0.0,
+          "indepChiefYmm": 0.0,
+          "optilandChiefYmm": 0.0,
+          "chiefDiffUm": 0.0,
+          "indepPolyRmsUm": 33.618,
+          "optilandPolyRmsUm": 33.618,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 0.5,
+          "indepChiefYmm": 0.872684,
+          "optilandChiefYmm": 0.872684,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 35.112,
+          "optilandPolyRmsUm": 35.112,
+          "rmsDiffUm": -0.0
+        },
+        {
+          "fieldDeg": 1.0,
+          "indepChiefYmm": 1.745495,
+          "optilandChiefYmm": 1.745495,
+          "chiefDiffUm": -0.0,
+          "indepPolyRmsUm": 39.421,
+          "optilandPolyRmsUm": 39.421,
+          "rmsDiffUm": -0.0
+        }
+      ],
+      "verificationPassed": true
+    }
+  ]
+}

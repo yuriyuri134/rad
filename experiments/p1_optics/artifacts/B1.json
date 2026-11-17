@@ -1,0 +1,284 @@
+{
+  "roundId": "B1",
+  "track": "B_doublet",
+  "title": "Optiland 优化 N-BK7 + N-F2 双胶合 (R1, R2, R3, 全局固定 BFL) [停滞记录]",
+  "hypothesis": "同时优化三面曲率与单一全局像面 BFL，在满足 EFL=100mm 与边缘厚度>=1.5mm 下，兼顾消球差、消彗差(满足正弦条件)与 F-C 消色差。",
+  "expectedOutcome": "0°/0.5°/1° 全部视场 RMS 光斑压缩至 ~10-25 μm 以下，F-C 轴向色差 <= 0.1 mm，Geometric MTF@30lp 显著超越单透镜。",
+  "initialPrescription": [
+    {
+      "radiusMm": 39.89072,
+      "thicknessMm": 6.0,
+      "glassAfter": "N-BK7",
+      "semiApertureMm": 14.0
+    },
+    {
+      "radiusMm": -50.77001,
+      "thicknessMm": 3.0,
+      "glassAfter": "N-F2",
+      "semiApertureMm": 14.0
+    },
+    {
+      "radiusMm": 672.76222,
+      "thicknessMm": 91.27922,
+      "glassAfter": "AIR",
+      "semiApertureMm": 14.0
+    }
+  ],
+  "finalPrescription": [
+    {
+      "radiusMm": 39.89072,
+      "thicknessMm": 6.0,
+      "glassAfter": "N-BK7",
+      "semiApertureMm": 14.0
+    },
+    {
+      "radiusMm": -50.77001,
+      "thicknessMm": 3.0,
+      "glassAfter": "N-F2",
+      "semiApertureMm": 14.0
+    },
+    {
+      "radiusMm": 672.76222,
+      "thicknessMm": 91.27922,
+      "glassAfter": "AIR",
+      "semiApertureMm": 14.0
+    }
+  ],
+  "fixedBflMm": 91.27922,
+  "optimization": {
+    "method": "optiland.optimization.LeastSquares (LM)",
+    "success": true,
+    "message": "`gtol` termination condition is satisfied.",
+    "nfev": 1,
+    "initialSumSquared": 1752.064426,
+    "finalSumSquared": 1752.064426,
+    "elapsedSec": 0.666
+  },
+  "metrics": {
+    "domain": "geometric_optics",
+    "focusRuleNote": "Optiland 优化求解单一全局像面 BFL 后冻结评价全视场与全波长",
+    "paraxialEflMm": 98.32576,
+    "eflErrorMm": -1.67424,
+    "fNumber": 3.933,
+    "fixedBflMm": 91.27922,
+    "paraxialDLineBflMm": 91.27922,
+    "defocusFromParaxialDLineMm": 0.0,
+    "paraxialFLineBflMm": 91.22139,
+    "paraxialCLineBflMm": 91.36914,
+    "axialChromaticShiftFcMm": -0.14775,
+    "edgeThicknessesMm": {
+      "element_s1_to_s2_at_14.0mm": 1.4942,
+      "element_s2_to_s3_at_14.0mm": 5.1141
+    },
+    "minEdgeThicknessMm": 1.4942,
+    "vignetting": {
+      "totalRaysTraced": 1953,
+      "totalClippedRays": 0,
+      "totalNanRays": 0,
+      "throughputFraction": 1.0
+    },
+    "overallPolychromaticRmsCentroidUm": 87.776,
+    "overallPolychromaticRmsChiefUm": 89.005,
+    "fieldResults": [
+      {
+        "fieldDeg": 0.0,
+        "idealImageHeightAtEflMm": 0.0,
+        "idealImageHeightAt100Mm": 0.0,
+        "chiefRayYDLineMm": 0.0,
+        "polychromaticCentroidYmm": 0.0,
+        "distortionPct": 0.0,
+        "comaAndAsymCentroidShiftUm": 0.0,
+        "lateralColorFcCentroidUm": 0.0,
+        "polychromaticRmsAboutChiefUm": 85.275,
+        "polychromaticRmsAboutCentroidUm": 85.275,
+        "byWavelength": {
+          "F": {
+            "wavelengthUm": 0.48613,
+            "rmsRadiusAboutChiefUm": 84.804,
+            "rmsRadiusAboutCentroidUm": 84.804,
+            "maxRadiusAboutCentroidUm": 140.378,
+            "centroidYmm": 0.0,
+            "centroidShiftFromChiefUm": 0.0,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          },
+          "d": {
+            "wavelengthUm": 0.58756,
+            "rmsRadiusAboutChiefUm": 87.946,
+            "rmsRadiusAboutCentroidUm": 87.946,
+            "maxRadiusAboutCentroidUm": 147.554,
+            "centroidYmm": 0.0,
+            "centroidShiftFromChiefUm": 0.0,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          },
+          "C": {
+            "wavelengthUm": 0.65627,
+            "rmsRadiusAboutChiefUm": 83.002,
+            "rmsRadiusAboutCentroidUm": 83.002,
+            "maxRadiusAboutCentroidUm": 141.54,
+            "centroidYmm": 0.0,
+            "centroidShiftFromChiefUm": 0.0,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          }
+        }
+      },
+      {
+        "fieldDeg": 0.5,
+        "idealImageHeightAtEflMm": 0.858076,
+        "idealImageHeightAt100Mm": 0.872687,
+        "chiefRayYDLineMm": 0.858076,
+        "polychromaticCentroidYmm": 0.846665,
+        "distortionPct": 0.0,
+        "comaAndAsymCentroidShiftUm": -11.411,
+        "lateralColorFcCentroidUm": -0.053,
+        "polychromaticRmsAboutChiefUm": 87.515,
+        "polychromaticRmsAboutCentroidUm": 86.768,
+        "byWavelength": {
+          "F": {
+            "wavelengthUm": 0.48613,
+            "rmsRadiusAboutChiefUm": 87.081,
+            "rmsRadiusAboutCentroidUm": 86.327,
+            "maxRadiusAboutCentroidUm": 162.948,
+            "centroidYmm": 0.846636,
+            "centroidShiftFromChiefUm": -11.44,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          },
+          "d": {
+            "wavelengthUm": 0.58756,
+            "rmsRadiusAboutChiefUm": 90.145,
+            "rmsRadiusAboutCentroidUm": 89.42,
+            "maxRadiusAboutCentroidUm": 169.686,
+            "centroidYmm": 0.846669,
+            "centroidShiftFromChiefUm": -11.407,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          },
+          "C": {
+            "wavelengthUm": 0.65627,
+            "rmsRadiusAboutChiefUm": 85.25,
+            "rmsRadiusAboutCentroidUm": 84.487,
+            "maxRadiusAboutCentroidUm": 163.495,
+            "centroidYmm": 0.846689,
+            "centroidShiftFromChiefUm": -11.387,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          }
+        }
+      },
+      {
+        "fieldDeg": 1.0,
+        "idealImageHeightAtEflMm": 1.716282,
+        "idealImageHeightAt100Mm": 1.745506,
+        "chiefRayYDLineMm": 1.716283,
+        "polychromaticCentroidYmm": 1.693452,
+        "distortionPct": 0.0,
+        "comaAndAsymCentroidShiftUm": -22.831,
+        "lateralColorFcCentroidUm": -0.106,
+        "polychromaticRmsAboutChiefUm": 93.994,
+        "polychromaticRmsAboutCentroidUm": 91.179,
+        "byWavelength": {
+          "F": {
+            "wavelengthUm": 0.48613,
+            "rmsRadiusAboutChiefUm": 93.659,
+            "rmsRadiusAboutCentroidUm": 90.82,
+            "maxRadiusAboutCentroidUm": 189.235,
+            "centroidYmm": 1.693395,
+            "centroidShiftFromChiefUm": -22.888,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          },
+          "d": {
+            "wavelengthUm": 0.58756,
+            "rmsRadiusAboutChiefUm": 96.516,
+            "rmsRadiusAboutCentroidUm": 93.778,
+            "maxRadiusAboutCentroidUm": 195.532,
+            "centroidYmm": 1.693459,
+            "centroidShiftFromChiefUm": -22.823,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          },
+          "C": {
+            "wavelengthUm": 0.65627,
+            "rmsRadiusAboutChiefUm": 91.744,
+            "rmsRadiusAboutCentroidUm": 88.87,
+            "maxRadiusAboutCentroidUm": 189.161,
+            "centroidYmm": 1.693501,
+            "centroidShiftFromChiefUm": -22.782,
+            "clippedRays": 0,
+            "nanRays": 0,
+            "totalRays": 217
+          }
+        }
+      }
+    ],
+    "geometricMtfDLine": {
+      "note": "GeometricMTF (scale=True diffraction envelope * geometric phase transfer) at d-line 587.56 nm; NOT wave-optics FFTMTF.",
+      "freq30ActualLpMm": 30.0,
+      "freq60ActualLpMm": 60.0,
+      "byField": [
+        {
+          "fieldDeg": 0.0,
+          "mtf30Tan": 0.1028,
+          "mtf30Sag": 0.1028,
+          "mtf60Tan": 0.0519,
+          "mtf60Sag": 0.0519
+        },
+        {
+          "fieldDeg": 0.5,
+          "mtf30Tan": 0.103,
+          "mtf30Sag": 0.1012,
+          "mtf60Tan": 0.0541,
+          "mtf60Sag": 0.0525
+        },
+        {
+          "fieldDeg": 1.0,
+          "mtf30Tan": 0.0972,
+          "mtf30Sag": 0.0946,
+          "mtf60Tan": 0.0569,
+          "mtf60Sag": 0.0533
+        }
+      ]
+    },
+    "aberrations": {
+      "seidelS1_to_S5": [
+        -0.040348,
+        -0.0048,
+        -0.000493,
+        -0.00034,
+        0.0
+      ],
+      "LchC_firstOrder": -0.14737,
+      "TchC_firstOrder": 0.00053,
+      "SC_thirdOrderSpherical": -1.24825,
+      "CC_thirdOrderComa": -0.01888,
+      "AC_thirdOrderAstigmatism": -0.01527,
+      "PC_thirdOrderPetzval": -0.01052,
+      "DC_thirdOrderDistortion": 0.0
+    },
+    "diffractionReferenceOnly": {
+      "airyDiskRadiusDLineUm": 2.819,
+      "note": "Theoretical Airy radius 1.22 * lambda_d * F/# for scale comparison only; not used as geometric simulation output."
+    }
+  },
+  "acceptance": {
+    "eflWithin1Mm": false,
+    "edgeThicknessOk": true,
+    "zeroClippedOrTir": true,
+    "polyRmsOk": false,
+    "chromaticOk": true,
+    "overallPassed": false
+  },
+  "surpriseOrFinding": "意外发现 Optiland 0.6.3 + NumPy 2.5.5 真实缺陷：B0 边缘厚度 1.4942 mm 略低于 min_val=1.5，导致 edge_thickness 操作数返回形状 (1,) 数组而非标量，引发 LeastSquares._compute_residuals_vector 构造异构数组抛出异常并被 except 吞掉，返回常数惩罚向量导致 scipy 误判 gtol 满足 (nfev=1, success=True 假成功)。",
+  "decision": "不采纳且不覆盖 B1 失败记录；新建 B1_retry：增加冕牌中心厚度至 6.8 mm 保证初始边缘厚度 > 1.5 mm，并按毫米/微米量纲重新平衡 rms_spot_size 权重后重跑。"
+}
