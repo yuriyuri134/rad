@@ -12,9 +12,9 @@
 - **读取与诊断分层（`server/storage.ts`）**：
   - `inspectCasBlob(expectedHash, workspaceDir)`：无异常抛出地返回 CAS 状态（`valid` / `missing` / `corrupted` / `unpinned`），用于在组件档案与工作台诊断中如实暴露 `casIntegrityStatus` 与 `casTamperDetected`，避免清单接口崩溃。
   - `readCasBlob(expectedHash, workspaceDir)`：严格校验实际字节 SHA-256 与预期 `immutableBlobHash` 是否一致；若 CAS 对象字节被篡改则立即抛出错误，**缺失返回 `null`，篡改直接拒绝**。
-- **执行侧统一回退策略（`server/runner.ts` `resolveAndAssertApproved`）**：
+- **执行侧独立回退策略（`server/runner.ts` `resolveAndAssertApproved` & `server/storage.ts` `readFrozenComponentSource`）**：
   - **篡改零容忍（Fail-Closed on Tamper）**：对于已固定 `immutableBlobHash` 的 `frozen` 版本（含主源码、`pinnedRelativeDeps`、`pinnedHostModules`），执行前**优先校验 CAS Blob**。即使磁盘工作区副本完好，一旦任一 CAS 对象本身被篡改，也**绝不静默掩盖或回退到磁盘**，直接报错阻断执行；
-  - **CAS 缺失时的严格哈希回退（Strict SHA-256 Verified Disk Fallback on Missing CAS）**：主源码、`pinnedRelativeDeps` 与 `pinnedHostModules` 三者保持完全一致的策略——仅当 CAS 对象缺失（`null`）且对应磁盘副本完整存在并精确匹配已固定的 64 位 `codeHash` 时，才允许读取经哈希验证的磁盘字节（此时标记 `executedFromCas: false`）；若磁盘副本亦缺失或哈希不匹配，则明确阻断执行。
+  - **按对象独立回退（Independent Per-Artifact Fallback on Missing CAS）**：主源码、`pinnedRelativeDeps` 各条目与 `pinnedHostModules` 各条目**分别独立判断**：各自 CAS 有效则直接采用已验证 CAS 字节（即使此时磁盘副本已删除，例如主源码 CAS 缺失但磁盘匹配、而宿主/相对依赖 CAS 仍完好但磁盘已删除，仍可混合使用已验证字节正常执行）；仅当该对象的 CAS 对象缺失（`null`）或未固定（`immutableBlobHash` 为空）时，才检查其对应磁盘副本是否完整匹配 64 位 `codeHash`，并强制将 `executedFromCas` 置为 `false`；若磁盘副本亦缺失或哈希不匹配，则明确阻断执行。
 - **工作区恢复（`restoreFrozenComponentWorkspaceFile`）**：
   - 从经 `readCasBlob` 验证的 CAS 不可变对象同时恢复主入口文件与全部 `pinnedRelativeDeps` 到 `workspace/components/<id>/<version>/`，保留可编辑 `draft` 目录不受影响；若 CAS 对象已损坏或缺失则拒绝恢复。
 
@@ -58,7 +58,7 @@
 
 | 检查项 | 执行命令 / 工具 | 结果 | 关键指标 / 输出 |
 | :--- | :--- | :--- | :--- |
-| **全量单元测试** | `node --test server/a0_audit.test.ts server/a1_models.test.ts server/a1_2_0_cas.test.ts server/a1_migrate.test.ts server/runner.test.ts src/core/*.test.ts` | **通过 (25 / 25)** | `tests 25`, `pass 25`, `fail 0`, `duration_ms 6220.707383` |
+| **全量单元测试** | `node --test server/a0_audit.test.ts server/a1_models.test.ts server/a1_2_0_cas.test.ts server/a1_migrate.test.ts server/runner.test.ts src/core/*.test.ts` | **通过 (26 / 26)** | `tests 26`, `pass 26`, `fail 0`, `duration_ms 6933.433158` |
 | **前端与服务端构建** | `compile_applet` (`vite build`) | **通过** | `Build succeeded - the applet is compiled` |
 | **TypeScript 类型检查** | `lint_applet` (`tsc --noEmit`) | **通过** | `Linting completed successfully ($ tsc --noEmit)` |
 | **真实工作区迁移与幂等性** | `migrateWorkspaceToStageA1('workspace')` 连续执行两次 | **通过** | `res1.success = true`、`res2.success = true`、两次全局状态哈希 **100% 一致**；`.migration_tmp` 无残留 |

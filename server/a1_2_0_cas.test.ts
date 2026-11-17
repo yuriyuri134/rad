@@ -984,3 +984,122 @@ export function applyVariableVector(s) { return s; }
     fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
+
+test('A1.2.0: independent CAS fallback uses intact dep/host CAS when primary CAS is missing, and marks executedFromCas=false when pinnedRelativeDeps immutableBlobHash is null', async () => {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-a120-indep-repo-'));
+  const tmpWs = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-a120-indep-ws-'));
+  const prevRepoEnv = process.env.OPENLAB_REPO_ROOT;
+
+  try {
+    const realOpticsPath = path.resolve(process.cwd(), 'src', 'core', 'optics.ts');
+    const originalOpticsCode = fs.readFileSync(realOpticsPath, 'utf8');
+    const originalOpticsHash = sha256(originalOpticsCode);
+    const isolatedOpticsDir = path.join(tmpRepo, 'src', 'core');
+    const isolatedOpticsPath = path.join(isolatedOpticsDir, 'optics.ts');
+    fs.mkdirSync(isolatedOpticsDir, { recursive: true });
+    fs.writeFileSync(isolatedOpticsPath, originalOpticsCode, 'utf8');
+
+    process.env.OPENLAB_REPO_ROOT = tmpRepo;
+    ensureWorkspaceInitialized(tmpWs);
+
+    // 1. Freeze solver-ts-preview@v0.1, then DELETE primary CAS blob AND DELETE src/core/optics.ts on disk
+    // while keeping primary disk file intact and keeping optics.ts CAS blob intact!
+    freezeComponentVersion('solver-ts-preview', 'v0.1', { runId: 'run-indep-host' }, tmpWs);
+    const { immutableStoreDir, componentsDir } = getWorkspacePaths(tmpWs);
+    const previewDossier = getComponent('solver-ts-preview', tmpWs)!.dossier;
+    const previewPrimaryBlobHash = previewDossier.versions.find((v) => v.version === 'v0.1')!.immutableBlobHash!;
+    assert.notEqual(previewPrimaryBlobHash, originalOpticsHash);
+
+    fs.unlinkSync(path.join(immutableStoreDir, previewPrimaryBlobHash));
+    fs.unlinkSync(isolatedOpticsPath);
+
+    // Independent fallback: primary comes from verified disk, optics.ts comes from intact CAS -> succeeds with executedFromCas=false!
+    const indepHostCtx = resolveAndAssertApproved('solver-ts-preview', 'v0.1', tmpWs);
+    assert.equal(indepHostCtx.executedFromCas, false);
+    assert.equal(indepHostCtx.verifiedHostModules['src/core/optics.ts'].codeHash, originalOpticsHash);
+    const solveAfterIndep = await runSolverComponent('solver-ts-preview', INITIAL_SINGLET_SPEC, tmpWs);
+    assert.ok(solveAfterIndep.result.paraxialEflMm > 50 && solveAfterIndep.result.paraxialEflMm < 200);
+
+    // 2. Freeze component with relative dep -> delete primary CAS blob AND delete relative dep on disk while keeping dep CAS intact!
+    const helperCode = `export function bonusScore() { return 7; }\n`;
+    const evalEntry = `import { bonusScore } from './helper.mjs';
+export function evaluate() {
+  return { passed: true, status: 'pass', lossScore: bonusScore(), summary: 'INDEP_REL_DEP_OK', checks: [], uncertainties: [] };
+}
+export function selfCheck() { return { passed: true, summary: 'ok' }; }
+`;
+    forkComponentVersion(
+      {
+        componentId: 'eval-rms-spot',
+        baseVersion: 'v0.1',
+        newVersion: 'v0.7-indep-dep',
+        changeSummary: '独立回退与未固定相对依赖测试',
+        codeContent: evalEntry,
+        updatedParams: {},
+      },
+      tmpWs,
+    );
+    const evalDir = path.join(componentsDir, 'eval-rms-spot', 'v0.7-indep-dep');
+    fs.writeFileSync(path.join(evalDir, 'helper.mjs'), helperCode, 'utf8');
+    approveComponentVersion('eval-rms-spot', 'v0.7-indep-dep', 'rad', tmpWs);
+    const frozenEval = freezeComponentVersion('eval-rms-spot', 'v0.7-indep-dep', { runId: 'run-indep-dep' }, tmpWs);
+    const frozenEvalVer = frozenEval.versions.find((v) => v.version === 'v0.7-indep-dep')!;
+    const evalPrimaryBlobHash = frozenEvalVer.immutableBlobHash!;
+    const depBlobHash = frozenEvalVer.pinnedRelativeDeps![0].immutableBlobHash!;
+
+    // Delete primary CAS blob AND delete helper.mjs on disk (dep CAS remains intact)
+    fs.unlinkSync(path.join(immutableStoreDir, evalPrimaryBlobHash));
+    fs.unlinkSync(path.join(evalDir, 'helper.mjs'));
+
+    const indepRelCtx = resolveAndAssertApproved('eval-rms-spot', 'v0.7-indep-dep', tmpWs);
+    assert.equal(indepRelCtx.executedFromCas, false);
+    assert.equal(indepRelCtx.verifiedRelativeDeps['helper.mjs'].code, helperCode);
+
+    const trace = traceOpticalSystem(INITIAL_SINGLET_SPEC);
+    const verdictIndep = await runEvaluatorComponent({
+      evaluatorId: 'eval-rms-spot',
+      evaluatorVersion: 'v0.7-indep-dep',
+      rawArtifacts: trace,
+      spec: INITIAL_SINGLET_SPEC,
+      workspaceDir: tmpWs,
+    });
+    assert.equal(verdictIndep.lossScore, 7);
+    assert.equal(verdictIndep.summary, 'INDEP_REL_DEP_OK');
+
+    const readIndep = readFrozenComponentSource('eval-rms-spot', 'v0.7-indep-dep', tmpWs);
+    assert.equal(readIndep.source, 'workspace');
+    assert.equal(readIndep.relativeDeps[0].codeContent, helperCode);
+
+    // 3. When pinnedRelativeDeps[0].immutableBlobHash is null on a frozen version:
+    // restore primary CAS + helper.mjs on disk, set dep immutableBlobHash = null -> executedFromCas MUST be false (never true!)
+    fs.writeFileSync(path.join(immutableStoreDir, evalPrimaryBlobHash), evalEntry, 'utf8');
+    fs.writeFileSync(path.join(evalDir, 'helper.mjs'), helperCode, 'utf8');
+    const rawEvalDossier = JSON.parse(
+      fs.readFileSync(path.join(componentsDir, 'eval-rms-spot', 'dossier.json'), 'utf8'),
+    );
+    const targetVer = rawEvalDossier.versions.find((v: { version: string }) => v.version === 'v0.7-indep-dep');
+    targetVer.pinnedRelativeDeps[0].immutableBlobHash = null;
+    saveComponentDossier(rawEvalDossier, tmpWs);
+
+    // Even if old dep blob exists on disk in CAS, immutableBlobHash=null is unpinned for that dep -> executedFromCas MUST be false
+    assert.ok(fs.existsSync(path.join(immutableStoreDir, depBlobHash)));
+    const unpinnedDepCtx = resolveAndAssertApproved('eval-rms-spot', 'v0.7-indep-dep', tmpWs);
+    assert.equal(unpinnedDepCtx.executedFromCas, false);
+    assert.equal(unpinnedDepCtx.verifiedRelativeDeps['helper.mjs'].code, helperCode);
+
+    // And if helper.mjs on disk is also tampered while dep immutableBlobHash is null -> MUST block execution
+    fs.writeFileSync(path.join(evalDir, 'helper.mjs'), 'export function bonusScore() { return 999; }\n', 'utf8');
+    assert.throws(
+      () => resolveAndAssertApproved('eval-rms-spot', 'v0.7-indep-dep', tmpWs),
+      /在 CAS 与工作区均不可用或哈希不匹配/,
+    );
+  } finally {
+    if (prevRepoEnv === undefined) {
+      delete process.env.OPENLAB_REPO_ROOT;
+    } else {
+      process.env.OPENLAB_REPO_ROOT = prevRepoEnv;
+    }
+    fs.rmSync(tmpWs, { recursive: true, force: true });
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
+  }
+});

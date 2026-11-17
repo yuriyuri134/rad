@@ -179,8 +179,10 @@ export function resolveAndAssertApproved(
           continue;
         }
         depsCasMissing = true;
+      } else {
+        depsCasMissing = true;
       }
-      // Fallback for deleted CAS relative dep: only allowed if workspace copy matches pinned hash
+      // Fallback for deleted/unpinned CAS relative dep: only allowed if workspace copy matches pinned hash
       if (fs.existsSync(depDiskPath)) {
         const depDisk = fs.readFileSync(depDiskPath, 'utf8');
         if (sha256(depDisk) === dep.codeHash) {
@@ -220,7 +222,7 @@ export function resolveAndAssertApproved(
       } else {
         hostCasMissing = true;
       }
-      // Fallback for deleted CAS host module: only allowed if repo disk copy strictly matches pinned SHA-256
+      // Fallback for deleted/unpinned CAS host module: only allowed if repo disk copy strictly matches pinned SHA-256
       const hostDiskPath = path.resolve(resolveRepoRoot(), hostMod.targetId);
       if (fs.existsSync(hostDiskPath) && !fs.statSync(hostDiskPath).isDirectory()) {
         const hostDisk = fs.readFileSync(hostDiskPath, 'utf8');
@@ -245,6 +247,10 @@ export function resolveAndAssertApproved(
       }
     }
 
+    let primaryCode: string;
+    let primaryHash: string;
+    let primaryFromCas = false;
+
     if (casCode !== null) {
       const casHash = sha256(casCode);
       if (casHash !== ver.immutableBlobHash || casHash !== ver.codeHash) {
@@ -252,35 +258,54 @@ export function resolveAndAssertApproved(
           `CAS 不可变存储哈希冲突：${dossier.id}@${ver.version} 预期 ${ver.codeHash}，CAS 实际 ${casHash}`,
         );
       }
-
-      const isActive = versionTag === dossier.activeVersion;
-      const review = dossier.codeSecurityReview;
-      const approvedForCas = isActive
-        ? review.approvedHash === casHash || (!review.approvedHash && review.status === 'builtin_reviewed')
-        : ver.author === 'system' ||
-          (ver.frozenByRunIds && ver.frozenByRunIds.length > 0) ||
-          review.approvedHash === casHash;
-
-      if (!approvedForCas) {
+      primaryCode = casCode;
+      primaryHash = casHash;
+      primaryFromCas = true;
+    } else {
+      // Independent per-artifact fallback when primary CAS blob is missing:
+      // preserve already-verified CAS/fallback relativeDeps and hostModules instead of discarding them.
+      if (ver.sourceAvailability === 'missing_on_disk' || !fs.existsSync(implPath)) {
         throw new Error(
-          `安全审查拦截：冻结组件 ${dossier.name} (${ver.version}) 尚未经人工哈希确认，禁止直接执行。`,
+          `组件 ${dossier.id}@${ver.version} CAS 缺失且源码文件在磁盘缺失，禁止伪造或执行：${implPath}`,
         );
       }
-
-      return {
-        dossier,
-        ver,
-        implPath,
-        verifiedCode: casCode,
-        verifiedHash: casHash,
-        verifiedRelativeDeps,
-        verifiedHostModules,
-        executedFromCas: !depsCasMissing && !hostCasMissing,
-        frozenWorkspaceModified: Boolean(ver.frozenWorkspaceModified),
-      };
+      const diskCode = fs.readFileSync(implPath, 'utf8');
+      const diskHash = sha256(diskCode);
+      if (diskHash !== ver.codeHash || diskHash !== ver.immutableBlobHash) {
+        throw new Error(
+          `安全审查拦截：冻结组件 ${dossier.name} (${ver.version}) 主源码 CAS 对象缺失且磁盘哈希 (${diskHash.slice(0, 12)}...) 与已固定哈希不一致，禁止执行。`,
+        );
+      }
+      primaryCode = diskCode;
+      primaryHash = diskHash;
+      primaryFromCas = false;
     }
-    // If primary CAS blob was deleted (casCode === null), fall through to strict disk verification:
-    // if workspace copy was also modified/deleted, below will reject it; if workspace copy is intact and matches ver.codeHash, it can still run with executedFromCas=false.
+
+    const isActive = versionTag === dossier.activeVersion;
+    const review = dossier.codeSecurityReview;
+    const approvedForCas = isActive
+      ? review.approvedHash === primaryHash || (!review.approvedHash && review.status === 'builtin_reviewed')
+      : ver.author === 'system' ||
+        (ver.frozenByRunIds && ver.frozenByRunIds.length > 0) ||
+        review.approvedHash === primaryHash;
+
+    if (!approvedForCas) {
+      throw new Error(
+        `安全审查拦截：冻结组件 ${dossier.name} (${ver.version}) 尚未经人工哈希确认，禁止直接执行。`,
+      );
+    }
+
+    return {
+      dossier,
+      ver,
+      implPath,
+      verifiedCode: primaryCode,
+      verifiedHash: primaryHash,
+      verifiedRelativeDeps,
+      verifiedHostModules,
+      executedFromCas: primaryFromCas && !depsCasMissing && !hostCasMissing,
+      frozenWorkspaceModified: Boolean(ver.frozenWorkspaceModified),
+    };
   }
 
   // Non-frozen Draft (or legacy/deleted-CAS frozen fallback): strictly read & verify disk copy ONCE

@@ -2210,15 +2210,15 @@ export function readFrozenComponentSource(
   if (
     diskContent !== null &&
     diskHash === ver.codeHash &&
-    ver.sourceAvailability !== 'missing_on_disk' &&
-    allDepsMatchWorkspace
+    ver.sourceAvailability !== 'missing_on_disk'
   ) {
+    const matches = Boolean(allDepsMatchWorkspace);
     return {
       codeContent: diskContent,
       codeHash: ver.codeHash,
       source: 'workspace',
-      workspaceMatchesFrozenHash: true,
-      frozenWorkspaceModified: false,
+      workspaceMatchesFrozenHash: matches,
+      frozenWorkspaceModified: !matches,
       relativeDeps,
     };
   }
