@@ -107,6 +107,7 @@ def build_optiland_system(spec: dict[str, Any]) -> Any:
 
 
 def analyze_optiland_system(system: Any, spec: dict[str, Any]) -> dict[str, Any]:
+    import numpy as np
     from optiland.analysis import SpotDiagram
     from optiland.mtf import GeometricMTF
 
@@ -121,7 +122,9 @@ def analyze_optiland_system(system: Any, spec: dict[str, Any]) -> dict[str, Any]
         num_rings=6,
         distribution="hexapolar",
     )
-    rms_mm = float(spot.rms_spot_radius(field_index=0))
+    rms_raw = spot.rms_spot_radius()
+    rms_arr = np.atleast_1d(np.asarray(rms_raw, dtype=float)).reshape(-1)
+    rms_mm = float(rms_arr[0])
     rms_um = rms_mm * 1000.0
 
     # Extract spot coordinates if available in SpotDiagram.data
@@ -142,7 +145,7 @@ def analyze_optiland_system(system: Any, spec: dict[str, Any]) -> dict[str, Any]
                     })
 
     # Geometric MTF
-    mtf_obj = GeometricMTF(optic=system, fields="all", wavelengths="primary", max_freq=100.0, num_rays=64)
+    mtf_obj = GeometricMTF(optic=system, fields="all", wavelength="primary", max_freq=100.0, num_rays=64)
     mtf_30 = 0.0
     mtf_60 = 0.0
     mtf_curve: list[dict[str, float]] = []

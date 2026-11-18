@@ -4,11 +4,16 @@ import type {
   ArchAnomaly,
   ArchEdge,
   ArchNode,
+  ArchitectureAnnotation,
   ArchitectureMapData,
   ArchitectureSnapshotDiff,
+  ArtifactRef,
   ComponentDossier,
   ExperimentRun,
+  ResearchStudy,
   RuntimeEnvironmentSnapshot,
+  StudyBranch,
+  WorkflowExecution,
 } from './types.ts';
 
 export interface BuildArchitectureMapInput {
@@ -16,27 +21,60 @@ export interface BuildArchitectureMapInput {
   components: ComponentDossier[];
   runs: ExperimentRun[];
   runtimeEnv: RuntimeEnvironmentSnapshot;
+  studies?: ResearchStudy[];
+  branches?: StudyBranch[];
+  executions?: WorkflowExecution[];
+  artifacts?: ArtifactRef[];
+  annotations?: ArchitectureAnnotation[];
+  pythonEnvDetails?: {
+    executable: string | null;
+    packages: Record<string, string | null>;
+  };
 }
 
-const SOURCE_SCAN_TARGETS = [
-  'server.ts',
-  'server/storage.ts',
-  'server/runner.ts',
-  'server/ai.ts',
-  'server/mjs_harness.mjs',
-  'src/App.tsx',
-  'src/core/types.ts',
-  'src/core/optics.ts',
-  'src/core/fits.ts',
-  'src/core/architectureMap.ts',
-  'src/components/TopBar.tsx',
-  'src/components/ExperimentWorkspace.tsx',
-  'src/components/ComponentLibrary.tsx',
-  'src/components/RunComparison.tsx',
-  'src/components/ArchitectureMapView.tsx',
-  'src/components/OpticalViewport.tsx',
-  'python/optiland_bridge.py',
-];
+function discoverRepoSourceFiles(rootDir: string): string[] {
+  const roots = [
+    'server.ts',
+    'src',
+    'server',
+    'python',
+    path.join('experiments', 'p2_flagship', 'scripts'),
+  ];
+  const collected: string[] = [];
+  const exts = new Set(['.ts', '.tsx', '.mjs', '.py']);
+
+  const walk = (absDir: string) => {
+    if (!fs.existsSync(absDir)) return;
+    const entries = fs.readdirSync(absDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '__pycache__') {
+        continue;
+      }
+      const absChild = path.join(absDir, entry.name);
+      if (entry.isDirectory()) {
+        walk(absChild);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (exts.has(ext) && !entry.name.endsWith('.test.ts')) {
+          collected.push(path.relative(rootDir, absChild).replace(/\\/g, '/'));
+        }
+      }
+    }
+  };
+
+  for (const r of roots) {
+    const abs = path.join(rootDir, r);
+    if (!fs.existsSync(abs)) continue;
+    const stat = fs.statSync(abs);
+    if (stat.isFile()) {
+      collected.push(r.replace(/\\/g, '/'));
+    } else if (stat.isDirectory()) {
+      walk(abs);
+    }
+  }
+
+  return Array.from(new Set(collected)).sort();
+}
 
 function extractRelativeImports(filePath: string, rootDir: string): Array<{ targetRel: string; rawSpec: string }> {
   if (!fs.existsSync(filePath)) return [];
@@ -56,7 +94,18 @@ function extractRelativeImports(filePath: string, rootDir: string): Array<{ targ
 }
 
 export function buildArchitectureMap(input: BuildArchitectureMapInput): ArchitectureMapData {
-  const { rootDir, components, runs, runtimeEnv } = input;
+  const {
+    rootDir,
+    components,
+    runs,
+    runtimeEnv,
+    studies = [],
+    branches = [],
+    executions = [],
+    artifacts = [],
+    annotations = [],
+    pythonEnvDetails,
+  } = input;
   const nodes: ArchNode[] = [];
   const edges: ArchEdge[] = [];
   const anomalies: ArchAnomaly[] = [];
@@ -84,33 +133,42 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
     kind: 'scope',
     parentId: null,
     provenance: 'declared',
-    evidence: '当前工作台顶层作用域，聚合磁盘组件、源码模块、实验账本与运行环境。',
+    evidence: '当前工作台顶层作用域，聚合研究课题分支、磁盘组件、源码模块、异步执行器、P1/P2 产物与运行环境。',
     status: 'healthy',
     summary: '可自由拆解、编辑与重组的开放科学实验系统。支持从整体逐层进入局部，并在任意层级返回。',
   });
 
-  // Top-level structural scopes
   const scopes: Array<{ id: string; label: string; summary: string; linkTab?: 'experiment' | 'components' | 'compare' | 'architecture' }> = [
+    ...(studies.length > 0
+      ? [
+          {
+            id: 'scope:studies',
+            label: `研究课题与探索分支 (${studies.length} 课题 · ${branches.length} 分支)`,
+            summary: '围绕开放科学工程问题组织的研究对象、阶段演进、多分支假设与显式采纳状态。',
+            linkTab: 'experiment' as const,
+          },
+        ]
+      : []),
     {
       id: 'scope:components',
       label: '独立组件库 (workspace/components)',
-      summary: '文件系统优先的可替换零件层：求解器、评价器、优化器、分析插件及架构地图引擎自身。',
+      summary: '文件系统优先的可替换零件层：求解器、评价器、优化器、FITS 分析插件及架构地图引擎自身。',
       linkTab: 'components',
     },
     {
       id: 'scope:experiments',
       label: '实验谱系与不可变账本 (workspace/runs.jsonl)',
       summary: '记录光学系统前后状态、完整原始计算产物、随机种子、环境版本与 64 位 SHA-256 指纹。',
-      linkTab: 'experiment',
+      linkTab: 'compare',
     },
     {
       id: 'scope:source-core',
-      label: '核心源码与执行桥梁 (src/ · server/ · python/)',
-      summary: '基于真实文件系统静态 import 扫描的前后端与本地进程执行桥梁。',
+      label: '核心源码与执行桥梁 (src/ · server/ · python/ · experiments/)',
+      summary: '基于真实文件系统动态递归扫描的前后端模块、Python 科学桥接与脚本。',
     },
     {
       id: 'scope:runtime-host',
-      label: `宿主运行环境 (${runtimeEnv.hostMode === 'local_python_ready' ? '本地 Python+Optiland 就绪' : '云端受限预览'})`,
+      label: `宿主运行环境 (${runtimeEnv.hostMode === 'local_python_ready' ? 'Python 科学环境就绪' : '云端受限预览'})`,
       summary: `Node ${runtimeEnv.nodeVersion} · Python ${runtimeEnv.pythonVersion ?? '未检出'} · Optiland ${runtimeEnv.optilandVersion ?? '未安装'}`,
     },
   ];
@@ -135,6 +193,34 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
       relation: 'contains',
       provenance: 'scanned',
       evidence: '顶层架构作用域包含关系',
+    });
+  }
+
+  if (pythonEnvDetails?.executable || runtimeEnv.optilandVersion) {
+    const pkgSummary = pythonEnvDetails?.packages
+      ? Object.entries(pythonEnvDetails.packages)
+          .filter(([, v]) => Boolean(v))
+          .map(([k, v]) => `${k}==${v}`)
+          .join(' · ')
+      : `optiland==${runtimeEnv.optilandVersion ?? '?'}`;
+    addNode({
+      id: 'runtime:python-scientific-env',
+      label: `Python 科学计算宿主 (${runtimeEnv.optilandVersion ? `Optiland ${runtimeEnv.optilandVersion}` : '受限'})`,
+      kind: 'runtime_host',
+      parentId: 'scope:runtime-host',
+      provenance: 'observed',
+      evidence: `动态探针探测可执行文件 ${pythonEnvDetails?.executable ?? 'python3'}`,
+      status: runtimeEnv.optilandVersion ? 'healthy' : 'unavailable',
+      summary: pkgSummary || '未检出科学计算包',
+      sourceFilePath: pythonEnvDetails?.executable ?? undefined,
+    });
+    addEdge({
+      id: 'e:scope:runtime-host->runtime:python-scientific-env:contains',
+      source: 'scope:runtime-host',
+      target: 'runtime:python-scientific-env',
+      relation: 'contains',
+      provenance: 'observed',
+      evidence: '宿主机 Python 环境实时探针',
     });
   }
 
@@ -177,12 +263,14 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
     }
   }
 
-  // 2. Scan real source modules & static imports
-  const knownSourceSet = new Set(SOURCE_SCAN_TARGETS);
-  for (const rel of SOURCE_SCAN_TARGETS) {
+  // 2. Scan real source modules & static imports dynamically across src/, server/, python/, experiments/p2_flagship/scripts/
+  const discoveredSourceFiles = discoverRepoSourceFiles(rootDir);
+  const knownSourceSet = new Set(discoveredSourceFiles);
+  for (const rel of discoveredSourceFiles) {
     const absPath = path.join(rootDir, rel);
     if (!fs.existsSync(absPath)) continue;
     const modId = `mod:${rel}`;
+    const isPyBridge = rel.startsWith('python/') || rel.startsWith('experiments/');
     addNode({
       id: modId,
       label: rel,
@@ -190,8 +278,7 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
       parentId: 'scope:source-core',
       provenance: 'scanned',
       evidence: `真实存在于磁盘的文件 ${rel}`,
-      status:
-        rel === 'python/optiland_bridge.py' && !runtimeEnv.optilandVersion ? 'unavailable' : 'healthy',
+      status: isPyBridge && !runtimeEnv.optilandVersion ? 'unavailable' : 'healthy',
       summary: `源码模块 ${rel}`,
       sourceFilePath: rel,
     });
@@ -206,8 +293,10 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
 
     const imports = extractRelativeImports(absPath, rootDir);
     for (const imp of imports) {
-      if (knownSourceSet.has(imp.targetRel)) {
-        const targetModId = `mod:${imp.targetRel}`;
+      const candidates = [imp.targetRel, `${imp.targetRel}.ts`, `${imp.targetRel}.tsx`, `${imp.targetRel}.mjs`];
+      const matchedRel = candidates.find((c) => knownSourceSet.has(c));
+      if (matchedRel) {
+        const targetModId = `mod:${matchedRel}`;
         addEdge({
           id: `e:${modId}->${targetModId}:depends_on`,
           source: modId,
@@ -220,7 +309,7 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
     }
   }
 
-  // Declared bridge connection from server/mjs_harness.mjs and server/runner.ts to python/optiland_bridge.py
+  // Declared bridge connections to subprocess runners
   if (knownSourceSet.has('server/runner.ts') && knownSourceSet.has('python/optiland_bridge.py')) {
     addEdge({
       id: 'e:mod:server/runner.ts->mod:python/optiland_bridge.py:uses',
@@ -239,6 +328,29 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
       relation: 'uses',
       provenance: 'declared',
       evidence: 'server/runner.ts 通过 child_process.execFile 调用 server/mjs_harness.mjs',
+    });
+  }
+  if (knownSourceSet.has('server/workbench.ts') && knownSourceSet.has('python/workbench_p2_runner.py')) {
+    addEdge({
+      id: 'e:mod:server/workbench.ts->mod:python/workbench_p2_runner.py:uses',
+      source: 'mod:server/workbench.ts',
+      target: 'mod:python/workbench_p2_runner.py',
+      relation: 'uses',
+      provenance: 'declared',
+      evidence: 'server/workbench.ts 通过受控异步 spawn 调用 python/workbench_p2_runner.py',
+    });
+  }
+  if (
+    knownSourceSet.has('python/workbench_p2_runner.py') &&
+    knownSourceSet.has('experiments/p2_flagship/scripts/wf_rc_models.py')
+  ) {
+    addEdge({
+      id: 'e:mod:python/workbench_p2_runner.py->mod:experiments/p2_flagship/scripts/wf_rc_models.py:depends_on',
+      source: 'mod:python/workbench_p2_runner.py',
+      target: 'mod:experiments/p2_flagship/scripts/wf_rc_models.py',
+      relation: 'depends_on',
+      provenance: 'declared',
+      evidence: 'workbench_p2_runner.py 导入 P2 真实参数化望远镜物理模型',
     });
   }
 
@@ -661,6 +773,150 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
     }
   }
 
+  // 6. ResearchStudies, StudyBranches, WorkflowExecutions & Typed Artifacts (OpenLab Bench v2)
+  for (const study of studies) {
+    const studyNodeId = `study:${study.id}`;
+    addNode({
+      id: studyNodeId,
+      label: study.title,
+      kind: 'research_study',
+      parentId: 'scope:studies',
+      provenance: study.provenanceTier === 'workbench_native' ? 'observed' : 'scanned',
+      provenanceTier: study.provenanceTier,
+      evidence: `研究课题 [${study.slug}] (${study.provenanceTier})`,
+      status: study.status === 'archived' ? 'warning' : 'healthy',
+      summary: study.problemStatement,
+      linkTarget: { tab: 'experiment', targetId: study.id },
+    });
+    addEdge({
+      id: `e:scope:studies->${studyNodeId}:contains`,
+      source: 'scope:studies',
+      target: studyNodeId,
+      relation: 'contains',
+      provenance: 'observed',
+      evidence: `课题归属于当前工作台研究空间`,
+    });
+  }
+
+  for (const branch of branches) {
+    const branchNodeId = `branch:${branch.id}`;
+    const parentId = nodeIds.has(`study:${branch.studyId}`) ? `study:${branch.studyId}` : 'scope:studies';
+    addNode({
+      id: branchNodeId,
+      label: `${branch.shortCode} · ${branch.name}${branch.status === 'adopted' ? ' [已采纳]' : ''}`,
+      kind: 'branch',
+      parentId,
+      provenance: branch.provenanceTier === 'workbench_native' ? 'observed' : 'scanned',
+      provenanceTier: branch.provenanceTier,
+      evidence: `分支 ${branch.id} (${branch.status} · ${branch.provenanceTier})`,
+      status: branch.status === 'rejected' || branch.status === 'archived_blocked' ? 'warning' : 'healthy',
+      summary: branch.hypothesis || branch.summary,
+      linkTarget: { tab: 'compare', targetId: branch.id },
+    });
+    addEdge({
+      id: `e:${parentId}->${branchNodeId}:contains`,
+      source: parentId,
+      target: branchNodeId,
+      relation: 'contains',
+      provenance: 'observed',
+      evidence: `课题 ${branch.studyId} 包含探索分支 ${branch.shortCode}`,
+    });
+    if (branch.parentBranchId) {
+      addEdge({
+        id: `e:${branchNodeId}->branch:${branch.parentBranchId}:derives_from`,
+        source: branchNodeId,
+        target: `branch:${branch.parentBranchId}`,
+        relation: 'derives_from',
+        provenance: 'observed',
+        evidence: `派生自父分支 ${branch.parentBranchId}`,
+      });
+    }
+  }
+
+  for (const exec of executions) {
+    const execNodeId = `exec:${exec.id}`;
+    const parentId = nodeIds.has(`branch:${exec.branchId}`) ? `branch:${exec.branchId}` : 'scope:studies';
+    addNode({
+      id: execNodeId,
+      label: `${exec.title} (${exec.runnerMode})`,
+      kind: 'workflow_execution',
+      parentId,
+      provenance: 'observed',
+      provenanceTier: exec.provenanceTier,
+      evidence: `执行记录 ${exec.id} (SHA-256=${exec.sha256Digest.slice(0, 12)}..., ${exec.durationMs}ms)`,
+      status: exec.status === 'completed' ? 'healthy' : 'error',
+      summary: exec.intent,
+      codeHash: exec.sha256Digest,
+      linkTarget: { tab: 'experiment', targetId: exec.studyId },
+    });
+    addEdge({
+      id: `e:${parentId}->${execNodeId}:contains`,
+      source: parentId,
+      target: execNodeId,
+      relation: 'contains',
+      provenance: 'observed',
+      evidence: `分支执行记录`,
+    });
+    if (
+      (exec.runnerMode === 'p2_wf_rc_perturb_eval' || exec.runnerMode === 'p2_fits_star_extract') &&
+      nodeIds.has('runtime:python-scientific-env')
+    ) {
+      addEdge({
+        id: `e:${execNodeId}->runtime:python-scientific-env:uses`,
+        source: execNodeId,
+        target: 'runtime:python-scientific-env',
+        relation: 'uses',
+        provenance: 'observed',
+        evidence: `通过 ${exec.pythonExecutable ?? 'python'} 执行科学计算`,
+      });
+    }
+  }
+
+  for (const art of artifacts) {
+    const artNodeId = `art:${art.id}`;
+    const parentId = nodeIds.has(`branch:${art.branchId}`) ? `branch:${art.branchId}` : 'scope:studies';
+    addNode({
+      id: artNodeId,
+      label: `${art.title} (${art.kind})`,
+      kind: 'subpart',
+      parentId,
+      provenance: 'scanned',
+      provenanceTier: art.provenanceTier,
+      evidence: `${art.relativePath} · SHA-256=${art.sha256.slice(0, 12)}...`,
+      status: 'healthy',
+      summary: `类型化科研产物：${art.relativePath}`,
+      codeHash: art.sha256,
+      sourceFilePath: art.relativePath,
+      linkTarget: { tab: 'compare', targetId: art.id },
+    });
+    addEdge({
+      id: `e:${parentId}->${artNodeId}:produces`,
+      source: parentId,
+      target: artNodeId,
+      relation: 'produces',
+      provenance: 'observed',
+      evidence: `分支生成/关联产物 ${art.relativePath}`,
+    });
+    if (art.executionId && nodeIds.has(`exec:${art.executionId}`)) {
+      addEdge({
+        id: `e:exec:${art.executionId}->${artNodeId}:produces`,
+        source: `exec:${art.executionId}`,
+        target: artNodeId,
+        relation: 'produces',
+        provenance: 'observed',
+        evidence: `执行记录直接产出 ${art.relativePath}`,
+      });
+    }
+  }
+
+  // Merge manual architecture annotations into node summaries (clearly marked as manual notes, never silent mutation)
+  for (const ann of annotations) {
+    const target = nodes.find((n) => n.id === ann.nodeId);
+    if (target) {
+      target.summary = `${target.summary}\n[人工注解·${ann.author}] ${ann.note}`;
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     rootScopeId,
@@ -669,16 +925,16 @@ export function buildArchitectureMap(input: BuildArchitectureMapInput): Architec
     anomalies,
     capabilitiesSummary: {
       realImplemented: [
+        '实时递归扫描 src/、server/、python/、experiments/p2_flagship/scripts/ 真实文件与相对 import 依赖',
         '实时扫描 workspace/components/* 目录、dossier.json 与磁盘源码 SHA-256 哈希',
-        '真实正则扫描 src/、server/、python/ 顶层相对路径 static import 依赖',
-        '读取 workspace/runs.jsonl 还原真实实验组合调用 (observed uses)、父子派生 (derives_from) 与重评记录',
-        '实时探测宿主机 Node/Python/Optiland 状态、未建档目录、自检过期与实验篡改异常',
+        '读取 workspace/runs.jsonl 与 workspace/workbench/ 还原 P1 光学账本与 P2 WF-RC-1000 多分支/产物/执行边',
+        '实时探测宿主机 Node/Python/Optiland/Astropy/SEP/Photutils 可执行路径与版本',
         '通过受控单步自引用 (isSelfReference=true) 将架构地图引擎自身纳入结构图谱且防止无限递归',
       ],
       declaredOrInferred: [
         'arch-map-engine 内部的 6 个子模块分工边为显式架构声明 (declared)',
-        '尚未在 runs.jsonl 出现过的独立组件依赖标注为声明 (declared) 并提示未观测到调用',
-        '暂未展开动态路径拼接或函数级 AST 调用图，也不支持在画布拖拽后反向改写源码',
+        '子进程调用边（server -> python runner）为声明边 (declared)，实际运行后生成 observed 边',
+        '结构人工注解 (manual annotation) 仅附注于节点视图，不自动改写磁盘代码',
       ],
     },
   };

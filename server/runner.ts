@@ -24,6 +24,7 @@ import {
   saveComponentDossier,
   sha256,
 } from './storage.ts';
+import { resolvePythonBinary } from './python_env.ts';
 
 const MJS_HARNESS_PATH = path.resolve(process.cwd(), 'server', 'mjs_harness.mjs');
 const PYTHON_BRIDGE_PATH = path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
@@ -93,8 +94,9 @@ function runVerifiedPythonComponent(
   stdinText: string,
   timeoutMs = 15000,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const { executable } = resolvePythonBinary();
   return runProcessWithStdin(
-    'python3',
+    executable,
     ['-c', PYTHON_VERIFIED_BOOTSTRAP, cliFlag],
     stdinText,
     timeoutMs,
@@ -409,7 +411,8 @@ export async function probePythonEnvironment(): Promise<{
   rawProbe: Record<string, unknown>;
 }> {
   try {
-    const { stdout } = await runProcessWithStdin('python3', [PYTHON_BRIDGE_PATH, '--probe'], '', 5000);
+    const { executable } = resolvePythonBinary();
+    const { stdout } = await runProcessWithStdin(executable, [PYTHON_BRIDGE_PATH, '--probe'], '', 5000);
     const probe = JSON.parse(stdout) as {
       pythonVersion?: string | null;
       pythonOkForOptiland?: boolean;
@@ -445,7 +448,7 @@ export async function runComponentSelfCheck(
   const now = new Date().toISOString();
 
   if (dossier.runtime === 'local_process_py') {
-    const { stdout } = await runVerifiedPythonComponent(verifiedCode, verifiedHash, implPath, '--check', '', 12000);
+    const { stdout } = await runVerifiedPythonComponent(verifiedCode, verifiedHash, implPath, '--check', '', 30000);
     const parsed = JSON.parse(stdout || '{}') as {
       status?: string;
       passed?: boolean;
@@ -545,7 +548,7 @@ export async function runSolverComponent(
       implPath,
       '--solve',
       JSON.stringify({ systemSpec: spec }),
-      20000,
+      30000,
     );
     const parsed = JSON.parse(stdout || '{}') as {
       status?: string;
@@ -801,7 +804,7 @@ export async function runStandaloneComponent(params: {
       implPath,
       '--solve',
       JSON.stringify({ systemSpec: params.spec ?? params.customInput ?? {} }),
-      15000,
+      30000,
     );
     return {
       componentId: dossier.id,

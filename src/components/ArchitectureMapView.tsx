@@ -18,14 +18,30 @@ import type {
   ArchNode,
   ArchProvenance,
   ArchRelationType,
+  ArchitectureAnnotation,
   ArchitectureMapData,
   ArchitectureSnapshotDiff,
+  EpistemicTag,
+  PersistedArchitectureSnapshot,
 } from '../core/types.ts';
 
 interface ArchitectureMapViewProps {
   initialFocusNodeId?: string | null;
   onJumpToTarget: (target: { tab: 'experiment' | 'components' | 'compare' | 'architecture'; targetId: string }) => void;
 }
+
+const NODE_KIND_LABELS: Record<ArchNode['kind'], string> = {
+  scope: '作用域',
+  component: '独立组件',
+  subpart: '子模块',
+  experiment_run: '历史运行',
+  source_module: '源码文件',
+  artifact_store: '数据账本/产物',
+  research_study: '研究课题',
+  branch: '研究分支',
+  workflow_execution: '工作流实算',
+  runtime_host: '科学计算环境',
+};
 
 const RELATION_META: Record<ArchRelationType, { label: string; color: string; dash?: string }> = {
   contains: { label: '包含 (contains)', color: '#64748b' },
@@ -90,18 +106,34 @@ export function ArchitectureMapView({ initialFocusNodeId, onJumpToTarget }: Arch
   const dragStateRef = useRef<{ nodeId: string; offsetX: number; offsetY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  // Snapshot diff state
+  // Snapshot diff & persisted snapshot state
   const [baselineSnapshot, setBaselineSnapshot] = useState<ArchitectureMapData | null>(null);
+  const [persistedSnapshots, setPersistedSnapshots] = useState<PersistedArchitectureSnapshot[]>([]);
+  const [annotations, setAnnotations] = useState<ArchitectureAnnotation[]>([]);
   const [snapshotDiff, setSnapshotDiff] = useState<ArchitectureSnapshotDiff | null>(null);
+  const [savingSnap, setSavingSnap] = useState(false);
+
+  // Manual annotation form
+  const [annoTag, setAnnoTag] = useState<EpistemicTag>('judgment');
+  const [annoText, setAnnoText] = useState('');
+  const [savingAnno, setSavingAnno] = useState(false);
 
   const loadMap = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/architecture-map');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '加载架构地图失败');
+      const [mapRes, snapRes] = await Promise.all([
+        fetch('/api/architecture-map'),
+        fetch('/api/architecture-snapshots'),
+      ]);
+      const data = await mapRes.json();
+      if (!mapRes.ok) throw new Error(data.error || '加载架构地图失败');
       setMapData(data as ArchitectureMapData);
+      if (snapRes.ok) {
+        const sd = await snapRes.json();
+        setPersistedSnapshots(sd.snapshots ?? []);
+        setAnnotations(sd.annotations ?? []);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -329,23 +361,65 @@ export function ArchitectureMapView({ initialFocusNodeId, onJumpToTarget }: Arch
     });
   };
 
-  const handleSaveSnapshot = () => {
+  const handleSaveSnapshot = async () => {
     if (!mapData) return;
-    setBaselineSnapshot(mapData);
-    setSnapshotDiff(null);
+    setSavingSnap(true);
+    try {
+      const res = await fetch('/api/architecture-snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: `工作台手动留存 (${mapData.nodes.length} 节点)` }),
+      });
+      const data = await res.json();
+      if (res.ok && data.snapshot) {
+        setPersistedSnapshots(data.snapshots ?? []);
+        setBaselineSnapshot(data.snapshot.mapData);
+        setSnapshotDiff(null);
+      } else {
+        setBaselineSnapshot(mapData);
+      }
+    } finally {
+      setSavingSnap(false);
+    }
   };
 
-  const handleComputeDiff = async () => {
-    if (!baselineSnapshot) return;
+  const handleComputeDiff = async (beforeOverride?: ArchitectureMapData) => {
+    const base = beforeOverride ?? baselineSnapshot;
+    if (!base) return;
     const res = await fetch('/api/architecture-map/snapshot-diff', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ beforeSnapshot: baselineSnapshot }),
+      body: JSON.stringify({ beforeSnapshot: base }),
     });
     const data = await res.json();
     if (res.ok) {
       setMapData(data.afterSnapshot);
       setSnapshotDiff(data.diff);
+    }
+  };
+
+  const handleAddAnnotation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!annoText.trim()) return;
+    setSavingAnno(true);
+    try {
+      const res = await fetch('/api/architecture-annotations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nodeId: selectedNodeId,
+          tag: annoTag,
+          note: annoText.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAnnotations(data.annotations ?? []);
+        setAnnoText('');
+        await loadMap();
+      }
+    } finally {
+      setSavingAnno(false);
     }
   };
 
@@ -403,19 +477,41 @@ export function ArchitectureMapView({ initialFocusNodeId, onJumpToTarget }: Arch
             <button
               type="button"
               onClick={handleSaveSnapshot}
+              disabled={savingSnap}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>{baselineSnapshot ? '已记录基线快照' : '保存结构快照'}</span>
+              <span>{savingSnap ? '保存中...' : '保存并留存持久化快照'}</span>
             </button>
+            {persistedSnapshots.length > 0 && (
+              <select
+                aria-label="选择已留存的架构快照用于对比"
+                value={baselineSnapshot?.generatedAt ?? ''}
+                onChange={(e) => {
+                  const found = persistedSnapshots.find((s) => s.mapData.generatedAt === e.target.value);
+                  if (found) {
+                    setBaselineSnapshot(found.mapData);
+                    handleComputeDiff(found.mapData);
+                  }
+                }}
+                className="px-2.5 py-1.5 text-xs font-mono bg-slate-50 border border-slate-300 rounded"
+              >
+                <option value="">已存快照 ({persistedSnapshots.length})…</option>
+                {persistedSnapshots.map((s) => (
+                  <option key={s.id} value={s.mapData.generatedAt}>
+                    {s.id} ({s.nodeCount}节点)
+                  </option>
+                ))}
+              </select>
+            )}
             {baselineSnapshot && (
               <button
                 type="button"
-                onClick={handleComputeDiff}
+                onClick={() => handleComputeDiff()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded cursor-pointer"
               >
                 <GitCompare className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>对比快照变化</span>
+                <span>对比当前结构差异</span>
               </button>
             )}
           </div>
@@ -643,7 +739,7 @@ export function ArchitectureMapView({ initialFocusNodeId, onJumpToTarget }: Arch
                     {shortLabel}
                   </text>
                   <text x="10" y="32" className="text-[9px] font-mono" fill="#64748b">
-                    {node.kind} · {node.provenance}
+                    {NODE_KIND_LABELS[node.kind] ?? node.kind} · {node.provenance}
                     {hasKids && !isBoundaryScope ? ` · +${childrenMap.get(node.id)?.length}内部` : ''}
                   </text>
                 </g>
@@ -783,6 +879,51 @@ export function ArchitectureMapView({ initialFocusNodeId, onJumpToTarget }: Arch
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Manual Epistemic Annotations for this Node */}
+          <div className="pt-3 border-t border-slate-200 space-y-2">
+            <div className="font-semibold text-slate-800">
+              节点人工架构标注 (manual provenance)
+            </div>
+            {annotations
+              .filter((a) => a.nodeId === selectedNode.id)
+              .map((a) => (
+                <div key={a.id} className="p-2 bg-amber-50/70 border border-amber-200 rounded text-[11px] space-y-0.5">
+                  <div className="font-mono text-amber-900 font-semibold">
+                    [{a.tag}] · {a.author}
+                  </div>
+                  <div className="text-slate-800">{a.note}</div>
+                </div>
+              ))}
+            <form onSubmit={handleAddAnnotation} className="space-y-1.5">
+              <div className="flex gap-1.5">
+                <select
+                  value={annoTag}
+                  onChange={(e) => setAnnoTag(e.target.value as EpistemicTag)}
+                  className="px-2 py-1 bg-white border border-slate-300 rounded text-[11px]"
+                >
+                  <option value="judgment">[判断]</option>
+                  <option value="fact">[事实]</option>
+                  <option value="hypothesis">[假设]</option>
+                  <option value="proposal">[提议]</option>
+                </select>
+                <input
+                  type="text"
+                  value={annoText}
+                  onChange={(e) => setAnnoText(e.target.value)}
+                  placeholder="为当前节点添加人工边界标注或演化注记..."
+                  className="flex-1 px-2 py-1 bg-white border border-slate-300 rounded text-[11px]"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingAnno || !annoText.trim()}
+                className="w-full py-1 text-[11px] font-medium text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded cursor-pointer"
+              >
+                {savingAnno ? '写入标注中...' : '保存节点标注'}
+              </button>
+            </form>
           </div>
         </aside>
       </div>

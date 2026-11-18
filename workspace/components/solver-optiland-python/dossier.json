@@ -55,11 +55,11 @@
   ],
   "parameters": [],
   "selfCheck": {
-    "status": "env_unavailable",
-    "checkedAt": "2026-11-16T21:11:12.701Z",
+    "status": "passed",
+    "checkedAt": "2026-11-18T13:46:11.014Z",
     "checkedCodeHash": "15a4ce1a973048d9446cfbe68637db61e6ea60c6dd29a63e5f6385e7a38b749a",
-    "summary": "当前 Python 3.10.12 环境未安装 optiland（Optiland 官方要求 Python >= 3.11）。请在 Rad 本地 Python 3.11+ 环境中执行 `pip install -e .` 安装后运行。",
-    "details": "{\"pythonVersion\":\"3.10.12\",\"pythonOkForOptiland\":false,\"platform\":\"Linux-4.19.0-gvisor-x86_64-with-glibc2.36\",\"optilandInstalled\":false,\"optilandVersion\":null,\"numpyVersion\":null,\"scipyVersion\":null,\"error\":\"当前 Python 3.10.12 环境未安装 optiland（Optiland 官方要求 Python >= 3.11）。请在 Rad 本地 Python 3.11+ 环境中执行 `pip install -e .` 安装后运行。\"}"
+    "summary": "Optiland 0.6.3 基准验证 EFL=97.413 mm, RMS=12.984 μm",
+    "details": "{\"pythonVersion\":\"3.12.16\",\"pythonOkForOptiland\":true,\"platform\":\"Linux-4.19.0-gvisor-x86_64-with-glibc2.36\",\"optilandInstalled\":true,\"optilandVersion\":\"0.6.3\",\"numpyVersion\":\"2.5.5\",\"scipyVersion\":\"1.18.1\",\"error\":null}"
   },
   "scientificValidation": {
     "status": "unvalidated",

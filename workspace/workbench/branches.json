@@ -1,0 +1,858 @@
+[
+  {
+    "id": "branch-p2-s0",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": null,
+    "name": "S0 裸 Ritchey-Chrétien 基准 (无校正镜)",
+    "shortCode": "S0",
+    "hypothesis": "检验纯两镜 Ritchey-Chrétien（消球差与彗差）在 1.2° 宽视场下的像散与场曲极限边界。",
+    "status": "baseline",
+    "provenanceTier": "external_verified_import",
+    "summary": "轴上接近衍射极限 (Strehl=0.988)，但 0.60° 边缘受像散+场曲主导退化至 RMS 170.74 μm、Strehl 0.0029，无法满足宽视场指标。",
+    "metrics": {
+      "eflMm": 6000,
+      "fNumber": 6,
+      "rms000Um": 1.213,
+      "rms025Um": 28.845,
+      "rms042Um": 83.147,
+      "rms060Um": 170.74,
+      "maxRmsPolyUm": 170.74,
+      "meanRmsPolyUm": 70.986,
+      "strehlCenter": 0.98774,
+      "strehlEdge": 0.0029,
+      "mtfEdgeTan": 0.0061,
+      "distortionMaxPct": 0.01217,
+      "k1": -1.12838839,
+      "k2": -6.22036543,
+      "sepCompletenessEdgePct": 3.6,
+      "photutilsCompletenessEdgePct": 0
+    },
+    "prescription": {
+      "D_mm": 1000,
+      "EFL_target_mm": 6000,
+      "F1": 2.2,
+      "f1_mm": 2200,
+      "R1_mm": -4400,
+      "K1": -1.12838839,
+      "d_M1_M2_mm": 1489.02439,
+      "R2_mm": -2245.186136,
+      "K2": -6.22036543,
+      "sp_M2_to_focus_mm": 1939.02439,
+      "back_clearance_behind_M1_mm": 450,
+      "central_obscuration_r_min_mm": 182.179,
+      "linear_obscuration_ratio": 0.3644,
+      "area_obscuration_ratio": 0.1328
+    },
+    "artifactIds": [
+      "art-p2-s0-json"
+    ],
+    "executionIds": [
+      "exec-p2-s0"
+    ],
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z",
+    "createdBy": "P2 Flagship Stage 1"
+  },
+  {
+    "id": "branch-p2-s1",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": "branch-p2-s0",
+    "name": "S1 两片 Fused Silica RC 像场校正镜",
+    "shortCode": "S1",
+    "hypothesis": "使用两片全熔石英弯月透镜是否足以同时抑制 1.2° 宽视场像散与场曲。",
+    "status": "rejected",
+    "provenanceTier": "external_verified_import",
+    "summary": "max_rms 降至 4.713 μm（优于 7.5 μm 指标），但 0.42° 中带高阶像散残余，边缘/中带 Strehl 仅为 0.454–0.709，未达到 >=0.80 衍射受限门槛。",
+    "metrics": {
+      "eflMm": 6012.697,
+      "fNumber": 6.0127,
+      "rms000Um": 3.433,
+      "rms025Um": 2.979,
+      "rms042Um": 4.713,
+      "rms060Um": 3.853,
+      "maxRmsPolyUm": 4.713,
+      "meanRmsPolyUm": 3.745,
+      "strehlCenter": 0.69874,
+      "strehlMid": 0.45377,
+      "strehlEdge": 0.70863,
+      "mtfEdgeTan": 0.6707,
+      "distortionMaxPct": 0.89679,
+      "k1": -1.1283884,
+      "k2": -6.2203654,
+      "dM1L1Mm": 251.905,
+      "bflMm": 57.789,
+      "optCost": 161.223,
+      "optSeedCount": 2,
+      "sepCompletenessEdgePct": 89.3,
+      "photutilsCompletenessEdgePct": 64.3,
+      "astrometryEdgeArcsec": 0.0437
+    },
+    "prescription": {
+      "branch_key": "S1",
+      "branch_id": "S1_2Lens_FS_RC",
+      "materials": [
+        "Fused Silica",
+        "Fused Silica"
+      ],
+      "unlock_conics": false,
+      "k1": -1.1283884,
+      "k2": -6.2203654,
+      "d_m1_l1_mm": 251.905,
+      "bfl_mm": 57.789,
+      "total_behind_m1_mm": 453.909,
+      "lenses": [
+        {
+          "lens": 1,
+          "material": "Fused Silica",
+          "r1_mm": -1744.459,
+          "r2_mm": -643.33,
+          "tc_mm": 20,
+          "gap_after_mm": 108.215,
+          "clear_semi_ap_mm": 79.45,
+          "edge_thickness_mm": 16.89
+        },
+        {
+          "lens": 2,
+          "material": "Fused Silica",
+          "r1_mm": -244.094,
+          "r2_mm": -573.743,
+          "tc_mm": 16,
+          "gap_after_mm": 57.789,
+          "clear_semi_ap_mm": 69.74,
+          "edge_thickness_mm": 21.92
+        }
+      ],
+      "best_u": [
+        -0.573244,
+        -1.554411,
+        -4.09679,
+        -1.742941,
+        2.519054,
+        1.082146,
+        0.57789
+      ],
+      "seed_runs": [
+        {
+          "seed": 0,
+          "cost": 161.223,
+          "nfev": 672,
+          "dt_s": 133.34,
+          "status": 2
+        },
+        {
+          "seed": 1,
+          "cost": 161.218,
+          "nfev": 266,
+          "dt_s": 51.73,
+          "status": 2
+        }
+      ],
+      "elapsed_total_s": 190.87,
+      "metrics": {
+        "valid": true,
+        "efl_mm": 6012.697,
+        "fno": 6.0127,
+        "rms_um_poly_by_field": {
+          "0.0": 3.433,
+          "0.25": 2.979,
+          "0.42": 4.713,
+          "0.6": 3.853
+        },
+        "rms_um_550nm_by_field": {
+          "0.0": 3.211,
+          "0.25": 2.203,
+          "0.42": 4.11,
+          "0.6": 3.575
+        },
+        "max_rms_poly_um": 4.713,
+        "mean_rms_poly_um": 3.745,
+        "rms_arcsec_poly_by_field": {
+          "0.0": 0.1178,
+          "0.25": 0.1022,
+          "0.42": 0.1617,
+          "0.6": 0.1322
+        },
+        "chief_y_550nm_mm": {
+          "0.0": 0,
+          "0.25": 26.27163,
+          "0.42": 44.26006,
+          "0.6": 63.52382
+        },
+        "clipped_rays": 2096,
+        "total_rays": 13072,
+        "lens_clear_semi_apertures_mm": {
+          "4": 74.45,
+          "5": 73.98,
+          "6": 64.28,
+          "7": 64.74
+        },
+        "fft_strehl_550nm": {
+          "0.0": 0.69874,
+          "0.25": 0.7136,
+          "0.42": 0.45377,
+          "0.6": 0.70863
+        },
+        "huygens_strehl_550nm": {
+          "0.0": 0.42164,
+          "0.42": 0.31139,
+          "0.6": 0.49833
+        },
+        "mtf_33lp_mm_550nm": {
+          "0.0": {
+            "tangential": 0.6903,
+            "sagittal": 0.6903
+          },
+          "0.25": {
+            "tangential": 0.7654,
+            "sagittal": 0.7425
+          },
+          "0.42": {
+            "tangential": 0.5907,
+            "sagittal": 0.7728
+          },
+          "0.6": {
+            "tangential": 0.6707,
+            "sagittal": 0.7531
+          }
+        },
+        "distortion_pct_by_field": {
+          "0.0": 0,
+          "0.25": 0.15026,
+          "0.42": 0.42984,
+          "0.6": 0.89679
+        },
+        "distortion_pct_max_abs": 0.89679
+      }
+    },
+    "artifactIds": [
+      "art-p2-s1-s4-v2"
+    ],
+    "executionIds": [
+      "exec-p2-s1"
+    ],
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z",
+    "createdBy": "P2 Flagship Stage 2"
+  },
+  {
+    "id": "branch-p2-s2",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": "branch-p2-s0",
+    "name": "S2 三片 Wynne 全熔石英校正镜 (锁定 RC 圆锥系数)",
+    "shortCode": "S2",
+    "hypothesis": "固定主次镜纯 RC K1/K2，引入经典三片式 Wynne 校正组，验证全视场衍射性能。",
+    "status": "exploring",
+    "provenanceTier": "external_verified_import",
+    "summary": "全视场 RMS 压至 1.855–2.297 μm，0.0°–0.60° 550nm Strehl 达到 0.870–0.922，通过全部主要光学指标，是纯 RC 镜面约束下最优构型。",
+    "metrics": {
+      "eflMm": 6007.695,
+      "fNumber": 6.0077,
+      "rms000Um": 2.476,
+      "rms025Um": 2.582,
+      "rms042Um": 3.221,
+      "rms060Um": 3.068,
+      "maxRmsPolyUm": 3.221,
+      "meanRmsPolyUm": 2.837,
+      "strehlCenter": 0.86549,
+      "strehlMid": 0.78747,
+      "strehlEdge": 0.85571,
+      "mtfEdgeTan": 0.7547,
+      "distortionMaxPct": 0.40707,
+      "k1": -1.1283884,
+      "k2": -6.2203654,
+      "dM1L1Mm": 191.008,
+      "bflMm": 55,
+      "optCost": 79.016,
+      "optSeedCount": 2,
+      "sepCompletenessEdgePct": 92.9,
+      "photutilsCompletenessEdgePct": 50,
+      "astrometryEdgeArcsec": 0.0339
+    },
+    "prescription": {
+      "branch_key": "S2",
+      "branch_id": "S2_3Lens_Wynne_FS_RC",
+      "materials": [
+        "Fused Silica",
+        "Fused Silica",
+        "Fused Silica"
+      ],
+      "unlock_conics": false,
+      "k1": -1.1283884,
+      "k2": -6.2203654,
+      "d_m1_l1_mm": 191.008,
+      "bfl_mm": 55,
+      "total_behind_m1_mm": 457.457,
+      "lenses": [
+        {
+          "lens": 1,
+          "material": "Fused Silica",
+          "r1_mm": -1913.896,
+          "r2_mm": -758.72,
+          "tc_mm": 22,
+          "gap_after_mm": 132.771,
+          "clear_semi_ap_mm": 83.07,
+          "edge_thickness_mm": 19.24
+        },
+        {
+          "lens": 2,
+          "material": "Fused Silica",
+          "r1_mm": -425.959,
+          "r2_mm": 987.922,
+          "tc_mm": 14,
+          "gap_after_mm": 22.678,
+          "clear_semi_ap_mm": 70.93,
+          "edge_thickness_mm": 22.5
+        },
+        {
+          "lens": 3,
+          "material": "Fused Silica",
+          "r1_mm": 200.883,
+          "r2_mm": 261.794,
+          "tc_mm": 20,
+          "gap_after_mm": 55,
+          "clear_semi_ap_mm": 71.14,
+          "edge_thickness_mm": 16.83
+        }
+      ],
+      "best_u": [
+        -0.522495,
+        -1.318009,
+        -2.347643,
+        1.012225,
+        4.978025,
+        3.819802,
+        1.910084,
+        1.327705,
+        0.226777,
+        0.550002
+      ],
+      "seed_runs": [
+        {
+          "seed": 0,
+          "cost": 79.016,
+          "nfev": 388,
+          "dt_s": 89.4,
+          "status": 3
+        },
+        {
+          "seed": 1,
+          "cost": 60.641,
+          "nfev": 489,
+          "dt_s": 108.64,
+          "status": 3
+        }
+      ],
+      "elapsed_total_s": 202.84,
+      "metrics": {
+        "valid": true,
+        "efl_mm": 6007.695,
+        "fno": 6.0077,
+        "rms_um_poly_by_field": {
+          "0.0": 2.476,
+          "0.25": 2.582,
+          "0.42": 3.221,
+          "0.6": 3.068
+        },
+        "rms_um_550nm_by_field": {
+          "0.0": 2.486,
+          "0.25": 2.279,
+          "0.42": 2.637,
+          "0.6": 2.43
+        },
+        "max_rms_poly_um": 3.221,
+        "mean_rms_poly_um": 2.837,
+        "rms_arcsec_poly_by_field": {
+          "0.0": 0.085,
+          "0.25": 0.0886,
+          "0.42": 0.1106,
+          "0.6": 0.1053
+        },
+        "chief_y_550nm_mm": {
+          "0.0": 0,
+          "0.25": 26.22615,
+          "0.42": 44.11321,
+          "0.6": 63.16303
+        },
+        "clipped_rays": 2096,
+        "total_rays": 13072,
+        "lens_clear_semi_apertures_mm": {
+          "4": 78.07,
+          "5": 77.53,
+          "6": 65.93,
+          "7": 65.69,
+          "8": 66.14,
+          "9": 64.48
+        },
+        "fft_strehl_550nm": {
+          "0.0": 0.86549,
+          "0.25": 0.7773,
+          "0.42": 0.78747,
+          "0.6": 0.85571
+        },
+        "huygens_strehl_550nm": {
+          "0.0": 0.52226,
+          "0.42": 0.56856,
+          "0.6": 0.62058
+        },
+        "mtf_33lp_mm_550nm": {
+          "0.0": {
+            "tangential": 0.7389,
+            "sagittal": 0.7389
+          },
+          "0.25": {
+            "tangential": 0.7578,
+            "sagittal": 0.7453
+          },
+          "0.42": {
+            "tangential": 0.7403,
+            "sagittal": 0.7499
+          },
+          "0.6": {
+            "tangential": 0.7547,
+            "sagittal": 0.7423
+          }
+        },
+        "distortion_pct_by_field": {
+          "0.0": 0,
+          "0.25": 0.05993,
+          "0.42": 0.17977,
+          "0.6": 0.40707
+        },
+        "distortion_pct_max_abs": 0.40707
+      }
+    },
+    "artifactIds": [
+      "art-p2-s1-s4-v2"
+    ],
+    "executionIds": [
+      "exec-p2-s2"
+    ],
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z",
+    "createdBy": "P2 Flagship Stage 2"
+  },
+  {
+    "id": "branch-p2-s3",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": "branch-p2-s0",
+    "name": "S3 三片 Wynne 全熔石英校正镜 + Quasi-RC 主次镜非球面微调",
+    "shortCode": "S3",
+    "hypothesis": "解锁主次镜圆锥系数 (K1, K2) 形成 Quasi-RC 协同消像差，检验能否将衍射 Strehl 与畸变推进至极值。",
+    "status": "adopted",
+    "provenanceTier": "external_verified_import",
+    "summary": "Stage 2 综合最优与 Stage 4/5 验证采纳基线：max_rms=1.063 μm，550nm Strehl=0.854–0.982，MTF@33.3=0.773–0.781，畸变 0.343%，K1=-1.14865/K2=-6.46154。",
+    "metrics": {
+      "eflMm": 6001.598,
+      "fNumber": 6.0016,
+      "rms000Um": 0.944,
+      "rms025Um": 0.922,
+      "rms042Um": 1.048,
+      "rms060Um": 1.063,
+      "maxRmsPolyUm": 1.063,
+      "meanRmsPolyUm": 0.994,
+      "strehlCenter": 0.98186,
+      "strehlMid": 0.85398,
+      "strehlEdge": 0.90832,
+      "mtfEdgeTan": 0.7731,
+      "distortionMaxPct": 0.34303,
+      "k1": -1.1486463,
+      "k2": -6.4615425,
+      "dM1L1Mm": 170.702,
+      "bflMm": 55,
+      "optCost": 11.064,
+      "optSeedCount": 2,
+      "sepCompletenessEdgePct": 96.4,
+      "photutilsCompletenessEdgePct": 42.9,
+      "astrometryEdgeArcsec": 0.037,
+      "mcBflOnlyP50RmsUm": 5.125,
+      "mcBflOnlyYield7_5Pct": 75,
+      "mcM2ShimP50RmsUm": 3.842,
+      "mcM2ShimYield7_5Pct": 100
+    },
+    "prescription": {
+      "branch_key": "S3",
+      "branch_id": "S3_3Lens_Wynne_FS_QuasiRC",
+      "materials": [
+        "Fused Silica",
+        "Fused Silica",
+        "Fused Silica"
+      ],
+      "unlock_conics": true,
+      "k1": -1.1486463,
+      "k2": -6.4615425,
+      "d_m1_l1_mm": 170.702,
+      "bfl_mm": 55,
+      "total_behind_m1_mm": 455.41,
+      "lenses": [
+        {
+          "lens": 1,
+          "material": "Fused Silica",
+          "r1_mm": 13517.867,
+          "r2_mm": -1644.121,
+          "tc_mm": 22,
+          "gap_after_mm": 147.523,
+          "clear_semi_ap_mm": 84.14,
+          "edge_thickness_mm": 19.58
+        },
+        {
+          "lens": 2,
+          "material": "Fused Silica",
+          "r1_mm": -483.375,
+          "r2_mm": 1227.064,
+          "tc_mm": 14,
+          "gap_after_mm": 26.185,
+          "clear_semi_ap_mm": 71.1,
+          "edge_thickness_mm": 21.32
+        },
+        {
+          "lens": 3,
+          "material": "Fused Silica",
+          "r1_mm": 225.726,
+          "r2_mm": 276.656,
+          "tc_mm": 20,
+          "gap_after_mm": 55,
+          "clear_semi_ap_mm": 70.93,
+          "edge_thickness_mm": 17.81
+        }
+      ],
+      "best_u": [
+        0.073976,
+        -0.608228,
+        -2.068785,
+        0.814954,
+        4.430141,
+        3.614602,
+        1.707023,
+        1.475227,
+        0.261852,
+        0.550001,
+        -1.148646,
+        -6.461543
+      ],
+      "seed_runs": [
+        {
+          "seed": 0,
+          "cost": 11.064,
+          "nfev": 368,
+          "dt_s": 89.49,
+          "status": 3
+        },
+        {
+          "seed": 1,
+          "cost": 11.196,
+          "nfev": 328,
+          "dt_s": 76.45,
+          "status": 3
+        }
+      ],
+      "elapsed_total_s": 172.12,
+      "metrics": {
+        "valid": true,
+        "efl_mm": 6001.598,
+        "fno": 6.0016,
+        "rms_um_poly_by_field": {
+          "0.0": 0.944,
+          "0.25": 0.922,
+          "0.42": 1.048,
+          "0.6": 1.063
+        },
+        "rms_um_550nm_by_field": {
+          "0.0": 0.823,
+          "0.25": 0.637,
+          "0.42": 0.75,
+          "0.6": 0.876
+        },
+        "max_rms_poly_um": 1.063,
+        "mean_rms_poly_um": 0.994,
+        "rms_arcsec_poly_by_field": {
+          "0.0": 0.0325,
+          "0.25": 0.0317,
+          "0.42": 0.036,
+          "0.6": 0.0365
+        },
+        "chief_y_550nm_mm": {
+          "0.0": 0,
+          "0.25": 26.19986,
+          "0.42": 44.06188,
+          "0.6": 63.0635
+        },
+        "clipped_rays": 2096,
+        "total_rays": 13072,
+        "lens_clear_semi_apertures_mm": {
+          "4": 79.14,
+          "5": 78.29,
+          "6": 66.1,
+          "7": 65.81,
+          "8": 65.93,
+          "9": 64.3
+        },
+        "fft_strehl_550nm": {
+          "0.0": 0.98186,
+          "0.25": 0.94499,
+          "0.42": 0.85398,
+          "0.6": 0.90832
+        },
+        "huygens_strehl_550nm": {
+          "0.0": 0.59827,
+          "0.42": 0.6415,
+          "0.6": 0.62378
+        },
+        "mtf_33lp_mm_550nm": {
+          "0.0": {
+            "tangential": 0.7778,
+            "sagittal": 0.7778
+          },
+          "0.25": {
+            "tangential": 0.7813,
+            "sagittal": 0.7795
+          },
+          "0.42": {
+            "tangential": 0.7751,
+            "sagittal": 0.7809
+          },
+          "0.6": {
+            "tangential": 0.7731,
+            "sagittal": 0.7789
+          }
+        },
+        "distortion_pct_by_field": {
+          "0.0": 0,
+          "0.25": 0.05356,
+          "0.42": 0.15721,
+          "0.6": 0.34303
+        },
+        "distortion_pct_max_abs": 0.34303
+      }
+    },
+    "artifactIds": [
+      "art-p2-s1-s4-v2",
+      "art-p2-stage4-tol"
+    ],
+    "executionIds": [
+      "exec-p2-s3"
+    ],
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z",
+    "createdBy": "P2 Flagship Stage 2"
+  },
+  {
+    "id": "branch-p2-s4",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": "branch-p2-s0",
+    "name": "S4 三片 Wynne FS+Schott F2 混合色散玻璃校正镜",
+    "shortCode": "S4",
+    "hypothesis": "将 L2 替换为 Schott F2 以平衡宽波段色差；同时记录单次长耗时仿真下的优化瓶颈。",
+    "status": "archived_blocked",
+    "provenanceTier": "external_verified_import",
+    "summary": "因色散高折射率玻璃耦合曲率陡峭，Stage 2 在预算内仅完成 1 个种子 (447 nfev, cost=597.635)，max_rms=9.704 μm 未达标，列为待重算开放问题。",
+    "metrics": {
+      "eflMm": 5987.006,
+      "fNumber": 5.987,
+      "rms000Um": 9.254,
+      "rms025Um": 5.659,
+      "rms042Um": 7.899,
+      "rms060Um": 9.704,
+      "maxRmsPolyUm": 9.704,
+      "meanRmsPolyUm": 8.129,
+      "strehlCenter": 0.07631,
+      "strehlMid": 0.24551,
+      "strehlEdge": 0.27485,
+      "mtfEdgeTan": 0.3755,
+      "distortionMaxPct": 0.35667,
+      "k1": -1.1283884,
+      "k2": -6.2203654,
+      "dM1L1Mm": 87.17,
+      "bflMm": 55.001,
+      "optCost": 597.635,
+      "optSeedCount": 1,
+      "sepCompletenessEdgePct": 92.9,
+      "photutilsCompletenessEdgePct": 85.7,
+      "astrometryEdgeArcsec": 0.0337
+    },
+    "prescription": {
+      "branch_key": "S4",
+      "branch_id": "S4_3Lens_Wynne_FS_F2_RC",
+      "materials": [
+        "Fused Silica",
+        "F2",
+        "Fused Silica"
+      ],
+      "unlock_conics": false,
+      "k1": -1.1283884,
+      "k2": -6.2203654,
+      "d_m1_l1_mm": 87.17,
+      "bfl_mm": 55.001,
+      "total_behind_m1_mm": 452.501,
+      "lenses": [
+        {
+          "lens": 1,
+          "material": "Fused Silica",
+          "r1_mm": -1926.127,
+          "r2_mm": -993.306,
+          "tc_mm": 22,
+          "gap_after_mm": 243.9,
+          "clear_semi_ap_mm": 89.27,
+          "edge_thickness_mm": 20.05
+        },
+        {
+          "lens": 2,
+          "material": "F2",
+          "r1_mm": -163.002,
+          "r2_mm": -177.251,
+          "tc_mm": 14,
+          "gap_after_mm": 10.429,
+          "clear_semi_ap_mm": 72.1,
+          "edge_thickness_mm": 15.49
+        },
+        {
+          "lens": 3,
+          "material": "Fused Silica",
+          "r1_mm": 1803.397,
+          "r2_mm": 616.886,
+          "tc_mm": 20,
+          "gap_after_mm": 55.001,
+          "clear_semi_ap_mm": 70.6,
+          "edge_thickness_mm": 22.67
+        }
+      ],
+      "best_u": [
+        -0.519177,
+        -1.006739,
+        -6.134876,
+        -5.641724,
+        0.554509,
+        1.621044,
+        0.871705,
+        2.439004,
+        0.104294,
+        0.55001
+      ],
+      "seed_runs": [
+        {
+          "seed": 0,
+          "cost": 597.635,
+          "nfev": 447,
+          "dt_s": 70.9,
+          "status": 3
+        }
+      ],
+      "elapsed_total_s": 75.86,
+      "metrics": {
+        "valid": true,
+        "efl_mm": 5987.006,
+        "fno": 5.987,
+        "rms_um_poly_by_field": {
+          "0.0": 9.254,
+          "0.25": 5.659,
+          "0.42": 7.899,
+          "0.6": 9.704
+        },
+        "rms_um_550nm_by_field": {
+          "0.0": 8.754,
+          "0.25": 5.396,
+          "0.42": 8.069,
+          "0.6": 9.427
+        },
+        "max_rms_poly_um": 9.704,
+        "mean_rms_poly_um": 8.129,
+        "rms_arcsec_poly_by_field": {
+          "0.0": 0.3188,
+          "0.25": 0.195,
+          "0.42": 0.2721,
+          "0.6": 0.3343
+        },
+        "chief_y_550nm_mm": {
+          "0.0": 0,
+          "0.25": 26.12999,
+          "0.42": 43.94595,
+          "0.6": 62.903
+        },
+        "clipped_rays": 2096,
+        "total_rays": 13072,
+        "lens_clear_semi_apertures_mm": {
+          "4": 84.27,
+          "5": 83.73,
+          "6": 65.41,
+          "7": 67.1,
+          "8": 65.6,
+          "9": 64.43
+        },
+        "fft_strehl_550nm": {
+          "0.0": 0.07631,
+          "0.25": 0.34645,
+          "0.42": 0.24551,
+          "0.6": 0.27485
+        },
+        "huygens_strehl_550nm": {
+          "0.0": 0.03558,
+          "0.42": 0.17372,
+          "0.6": 0.20026
+        },
+        "mtf_33lp_mm_550nm": {
+          "0.0": {
+            "tangential": 0.2377,
+            "sagittal": 0.2377
+          },
+          "0.25": {
+            "tangential": 0.7034,
+            "sagittal": 0.5122
+          },
+          "0.42": {
+            "tangential": 0.3782,
+            "sagittal": 0.7105
+          },
+          "0.6": {
+            "tangential": 0.3755,
+            "sagittal": 0.5747
+          }
+        },
+        "distortion_pct_by_field": {
+          "0.0": 0,
+          "0.25": 0.05492,
+          "0.42": 0.16218,
+          "0.6": 0.35667
+        },
+        "distortion_pct_max_abs": 0.35667
+      }
+    },
+    "artifactIds": [
+      "art-p2-s1-s4-v2"
+    ],
+    "executionIds": [
+      "exec-p2-s4"
+    ],
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z",
+    "createdBy": "P2 Flagship Stage 2"
+  },
+  {
+    "id": "branch-wb-mwm6gffc",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": "branch-p2-s3",
+    "name": "S1-S4 16帧批量 FITS 欠采样横评",
+    "shortCode": "E6",
+    "hypothesis": "跨 S1–S4 全部视场与像斑尺度验证 DAO(fwhm=1.5px) 与 SEP 的交叉匹配率，同时检查假阳性余项。",
+    "status": "exploring",
+    "provenanceTier": "workbench_native",
+    "summary": "批量 FITS 欠采样横评 (16 帧, DAO fwhm=1.5px): 相对 SEP 均匹配率 88.2% (最低 67.9%, Stage3 DAO 3px均值 65.4%), 额外未匹配余项 30",
+    "metrics": {
+      "fitsBatchTilesCount": 16,
+      "batchMeanDaoMatchPct": 88.2,
+      "batchMinDaoMatchPct": 67.9,
+      "batchMeanDaoTruthPct": 86.6,
+      "batchStage3Dao3pxPct": 65.4,
+      "batchDaoUnmatchedExcess": 30,
+      "fwhmPx": 1.5
+    },
+    "artifactIds": [
+      "art-exec-wb-mwm6gffc-json",
+      "art-exec-wb-mwm6gffc-log"
+    ],
+    "executionIds": [
+      "exec-wb-mwm6gffc"
+    ],
+    "createdAt": "2026-11-18T13:49:04.918Z",
+    "updatedAt": "2026-11-18T13:49:04.918Z",
+    "createdBy": "Rad + Workbench Python Runner"
+  }
+]

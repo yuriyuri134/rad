@@ -1,9 +1,164 @@
-import type { FitsAnalysisResult, FitsHeaderCard, FitsSourceDetection } from './types.ts';
+import type {
+  FitsAnalysisResult,
+  FitsHeaderCard,
+  FitsSourceDetection,
+  FitsWcsInfo,
+} from './types.ts';
+
+export interface ParseFitsOptions {
+  maxSources?: number;
+  thresholdSigma?: number;
+  apertureRadiusPx?: number;
+}
+
+interface InternalTanWcs extends FitsWcsInfo {
+  cd11: number;
+  cd12: number;
+  cd21: number;
+  cd22: number;
+}
+
+export function extractTanWcs(headers: FitsHeaderCard[], width: number, height: number): FitsWcsInfo | null {
+  const internal = buildInternalTanWcs(headers, width, height);
+  if (!internal) return null;
+  return {
+    ctype1: internal.ctype1,
+    ctype2: internal.ctype2,
+    crval1: internal.crval1,
+    crval2: internal.crval2,
+    crpix1: internal.crpix1,
+    crpix2: internal.crpix2,
+    cdelt1: internal.cdelt1,
+    cdelt2: internal.cdelt2,
+    pixelScaleArcsec: internal.pixelScaleArcsec,
+    centerRaDeg: internal.centerRaDeg,
+    centerDecDeg: internal.centerDecDeg,
+  };
+}
+
+function buildInternalTanWcs(
+  headers: FitsHeaderCard[],
+  width: number,
+  height: number,
+): InternalTanWcs | null {
+  const getNum = (kw: string): number | null => {
+    const raw = headers.find((h) => h.keyword === kw)?.value;
+    if (raw === undefined) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  };
+  const getStr = (kw: string): string | null => headers.find((h) => h.keyword === kw)?.value ?? null;
+
+  const crval1 = getNum('CRVAL1');
+  const crval2 = getNum('CRVAL2');
+  const crpix1 = getNum('CRPIX1');
+  const crpix2 = getNum('CRPIX2');
+  if (crval1 === null || crval2 === null || crpix1 === null || crpix2 === null) {
+    return null;
+  }
+
+  const ctype1 = getStr('CTYPE1') ?? 'RA---TAN';
+  const ctype2 = getStr('CTYPE2') ?? 'DEC--TAN';
+
+  const cd11Raw = getNum('CD1_1');
+  const cd12Raw = getNum('CD1_2');
+  const cd21Raw = getNum('CD2_1');
+  const cd22Raw = getNum('CD2_2');
+  const cdelt1Raw = getNum('CDELT1');
+  const cdelt2Raw = getNum('CDELT2');
+
+  let cd11 = 0;
+  let cd12 = 0;
+  let cd21 = 0;
+  let cd22 = 0;
+
+  if (cd11Raw !== null || cd22Raw !== null) {
+    cd11 = cd11Raw ?? 0;
+    cd12 = cd12Raw ?? 0;
+    cd21 = cd21Raw ?? 0;
+    cd22 = cd22Raw ?? 0;
+  } else if (cdelt1Raw !== null && cdelt2Raw !== null) {
+    const pc11 = getNum('PC1_1') ?? 1;
+    const pc12 = getNum('PC1_2') ?? 0;
+    const pc21 = getNum('PC2_1') ?? 0;
+    const pc22 = getNum('PC2_2') ?? 1;
+    cd11 = cdelt1Raw * pc11;
+    cd12 = cdelt1Raw * pc12;
+    cd21 = cdelt2Raw * pc21;
+    cd22 = cdelt2Raw * pc22;
+  } else {
+    return null;
+  }
+
+  const scaleX = Math.hypot(cd11, cd21) * 3600;
+  const scaleY = Math.hypot(cd12, cd22) * 3600;
+  const pixelScaleArcsec = Number(((scaleX + scaleY) * 0.5).toFixed(4));
+
+  const tempWcs: InternalTanWcs = {
+    ctype1,
+    ctype2,
+    crval1,
+    crval2,
+    crpix1,
+    crpix2,
+    cdelt1: cdelt1Raw ?? cd11,
+    cdelt2: cdelt2Raw ?? cd22,
+    pixelScaleArcsec,
+    centerRaDeg: crval1,
+    centerDecDeg: crval2,
+    cd11,
+    cd12,
+    cd21,
+    cd22,
+  };
+
+  const centerWorld = projectTanInternal((width - 1) * 0.5, (height - 1) * 0.5, tempWcs);
+  tempWcs.centerRaDeg = centerWorld.raDeg;
+  tempWcs.centerDecDeg = centerWorld.decDeg;
+  return tempWcs;
+}
+
+function projectTanInternal(x0Indexed: number, y0Indexed: number, wcs: InternalTanWcs): { raDeg: number; decDeg: number } {
+  const dx = x0Indexed + 1 - wcs.crpix1;
+  const dy = y0Indexed + 1 - wcs.crpix2;
+  const xiDeg = wcs.cd11 * dx + wcs.cd12 * dy;
+  const etaDeg = wcs.cd21 * dx + wcs.cd22 * dy;
+
+  const deg2rad = Math.PI / 180;
+  const xiRad = xiDeg * deg2rad;
+  const etaRad = etaDeg * deg2rad;
+  const alpha0 = wcs.crval1 * deg2rad;
+  const delta0 = wcs.crval2 * deg2rad;
+
+  const denom = Math.cos(delta0) - etaRad * Math.sin(delta0);
+  let raDeg = (alpha0 + Math.atan2(xiRad, denom)) / deg2rad;
+  raDeg = ((raDeg % 360) + 360) % 360;
+  const decDeg = Math.atan2(Math.sin(delta0) + etaRad * Math.cos(delta0), Math.hypot(xiRad, denom)) / deg2rad;
+
+  return {
+    raDeg: Number(raDeg.toFixed(6)),
+    decDeg: Number(decDeg.toFixed(6)),
+  };
+}
+
+export function pixelToWorldTan(x0Indexed: number, y0Indexed: number, wcs: FitsWcsInfo): { raDeg: number; decDeg: number } {
+  return projectTanInternal(x0Indexed, y0Indexed, {
+    ...wcs,
+    cd11: wcs.cdelt1,
+    cd12: 0,
+    cd21: 0,
+    cd22: wcs.cdelt2,
+  });
+}
 
 /**
  * Parses an authentic IEEE / IAU FITS binary file (2880-byte ASCII header blocks + big-endian image array).
  */
-export function parseFitsBuffer(buffer: Uint8Array, fileName = 'observation.fits'): FitsAnalysisResult {
+export function parseFitsBuffer(
+  buffer: Uint8Array,
+  fileName = 'observation.fits',
+  options?: ParseFitsOptions,
+): FitsAnalysisResult {
   if (buffer.byteLength < 2880) {
     throw new Error(`FITS 文件长度不足 2880 字节（当前 ${buffer.byteLength} 字节）`);
   }
@@ -106,7 +261,8 @@ export function parseFitsBuffer(buffer: Uint8Array, fileName = 'observation.fits
   const mad = absDev[Math.floor(absDev.length / 2)] ?? 0;
   const madNoise = Math.max(1e-6, mad * 1.4826);
 
-  const detectedSources = detectApertureSources(pixels, width, height, medianSky, madNoise);
+  const wcsInternal = buildInternalTanWcs(headers, width, height);
+  const detectedSources = detectApertureSources(pixels, width, height, medianSky, madNoise, wcsInternal, options);
 
   return {
     fileName,
@@ -127,6 +283,22 @@ export function parseFitsBuffer(buffer: Uint8Array, fileName = 'observation.fits
     madNoise: Number(madNoise.toFixed(3)),
     pixels,
     detectedSources,
+    wcs: wcsInternal
+      ? {
+          ctype1: wcsInternal.ctype1,
+          ctype2: wcsInternal.ctype2,
+          crval1: wcsInternal.crval1,
+          crval2: wcsInternal.crval2,
+          crpix1: wcsInternal.crpix1,
+          crpix2: wcsInternal.crpix2,
+          cdelt1: wcsInternal.cdelt1,
+          cdelt2: wcsInternal.cdelt2,
+          pixelScaleArcsec: wcsInternal.pixelScaleArcsec,
+          centerRaDeg: wcsInternal.centerRaDeg,
+          centerDecDeg: wcsInternal.centerDecDeg,
+        }
+      : null,
+    extractorUsed: 'ts_aperture',
   };
 }
 
@@ -145,8 +317,13 @@ function detectApertureSources(
   height: number,
   medianSky: number,
   noiseSigma: number,
+  wcs: InternalTanWcs | null,
+  options?: ParseFitsOptions,
 ): FitsSourceDetection[] {
-  const threshold = medianSky + 6 * noiseSigma;
+  const sigmaThresh = options?.thresholdSigma ?? 6;
+  const maxSources = options?.maxSources ?? 64;
+  const apertureRadius = Math.max(2, Math.min(10, Math.round(options?.apertureRadiusPx ?? 4)));
+  const threshold = medianSky + sigmaThresh * noiseSigma;
   const peaks: Array<{ x: number; y: number; val: number }> = [];
 
   for (let y = 2; y < height - 2; y++) {
@@ -175,11 +352,11 @@ function detectApertureSources(
     if (selected.every((s) => Math.hypot(s.x - p.x, s.y - p.y) >= 6)) {
       selected.push(p);
     }
-    if (selected.length >= 12) break;
+    if (selected.length >= maxSources) break;
   }
 
   return selected.map((peak, idx) => {
-    const r = 4;
+    const r = apertureRadius;
     let fluxSum = 0;
     let wx = 0;
     let wy = 0;
@@ -216,6 +393,8 @@ function detectApertureSources(
     const sigma = fluxSum > 0 ? Math.sqrt(r2Weighted / (2 * fluxSum)) : 1.0;
     const fwhm = sigma * 2.3548;
     const snr = (peak.val - medianSky) / noiseSigma;
+    const world = wcs ? projectTanInternal(cx, cy, wcs) : null;
+    const fwhmArcsec = wcs ? Number((fwhm * wcs.pixelScaleArcsec).toFixed(3)) : null;
 
     return {
       id: idx + 1,
@@ -225,6 +404,10 @@ function detectApertureSources(
       apertureFlux: Number(fluxSum.toFixed(1)),
       snrEstimate: Number(snr.toFixed(1)),
       fwhmPxEstimate: Number(fwhm.toFixed(2)),
+      raDeg: world ? world.raDeg : null,
+      decDeg: world ? world.decDeg : null,
+      fwhmArcsec,
+      extractor: 'ts_aperture',
     };
   });
 }

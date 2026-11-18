@@ -7,10 +7,12 @@ import {
   FlaskConical,
   Network,
   Play,
+  Plus,
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
 import type { ComponentDossier, ExperimentRun } from '../core/types.ts';
+import type { DiscoveredPythonRuntime } from './ResearchStudio.tsx';
 
 interface ComponentLibraryProps {
   components: ComponentDossier[];
@@ -19,6 +21,7 @@ interface ComponentLibraryProps {
   onSelectId: (id: string) => void;
   onInspectInArchitecture: (nodeId: string) => void;
   onRefresh: () => Promise<void>;
+  pythonRuntime?: DiscoveredPythonRuntime;
 }
 
 const KIND_LABELS: Record<string, string> = {
@@ -78,11 +81,31 @@ export function ComponentLibrary({
   onSelectId,
   onInspectInArchitecture,
   onRefresh,
+  pythonRuntime,
 }: ComponentLibraryProps) {
   const activeId = selectedId || components[0]?.id || '';
   const [dossier, setDossier] = useState<ComponentDossier | null>(null);
   const [codeByVersion, setCodeByVersion] = useState<Record<string, string>>({});
   const [inspectVersion, setInspectVersion] = useState<string>('v0.1');
+
+  // Create new component drawer state
+  const [showCreateComp, setShowCreateComp] = useState(false);
+  const [newCompId, setNewCompId] = useState('');
+  const [newCompName, setNewCompName] = useState('');
+  const [newCompKind, setNewCompKind] = useState('analysis_plugin');
+  const [newCompRuntime, setNewCompRuntime] = useState<'local_process_mjs' | 'local_process_py'>('local_process_mjs');
+  const [newCompSummary, setNewCompSummary] = useState('');
+  const [newCompCode, setNewCompCode] = useState(
+`export async function main(input) {
+  if (process.argv.includes('--check')) {
+    console.log(JSON.stringify({ ok: true, summary: '自定义组件自检通过' }));
+    return;
+  }
+  console.log(JSON.stringify({ ok: true, echoedInput: input }));
+}
+`,
+  );
+  const [creatingComp, setCreatingComp] = useState(false);
 
   // Fork editor state
   const [isForking, setIsForking] = useState(false);
@@ -287,6 +310,41 @@ export function ComponentLibrary({
     }
   };
 
+  const handleCreateComponent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingComp(true);
+    setErrorMsg(null);
+    setActionMsg(null);
+    try {
+      const res = await fetch('/api/components/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: newCompId.trim(),
+          name: newCompName.trim(),
+          kind: newCompKind,
+          runtime: newCompRuntime,
+          summary: newCompSummary.trim() || newCompName.trim(),
+          purpose: newCompSummary.trim() || '在工作台组件库新建的可复用计算/评估组件',
+          codeContent: newCompCode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '新建组件失败');
+      setShowCreateComp(false);
+      setNewCompId('');
+      setNewCompName('');
+      setNewCompSummary('');
+      await onRefresh();
+      onSelectId(data.dossier.id);
+      setActionMsg(`已在 workspace/components/${data.dossier.id} 创建新组件，并登记 SHA-256 哈希。`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreatingComp(false);
+    }
+  };
+
   const canFork =
     dossier?.runtime === 'local_process_mjs' || dossier?.runtime === 'local_process_py';
   const checkMeta = dossier ? selfCheckLabel(dossier.selfCheck.status) : null;
@@ -297,7 +355,157 @@ export function ComponentLibrary({
     (dossier.diskTamperDetected || dossier.codeSecurityReview.status === 'unreviewed_modified');
 
   return (
-    <div className="max-w-[1440px] mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[330px_1fr] gap-6 items-start">
+    <div className="max-w-[1440px] mx-auto px-6 py-6 space-y-5">
+      {/* Python Environment & Authoring Header */}
+      <div className="bg-white border border-slate-200 rounded-md p-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold text-slate-900">
+            工作区外部科学运行环境与独立组件编排目录
+          </div>
+          {pythonRuntime ? (
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-600 tabular-nums">
+              <span>解释器: {pythonRuntime.executable}</span>
+              <span>Python {pythonRuntime.pythonVersion ?? '未知'}</span>
+              <span>optiland {pythonRuntime.packages.optiland ?? '—'}</span>
+              <span>astropy {pythonRuntime.packages.astropy ?? '—'}</span>
+              <span>photutils {pythonRuntime.packages.photutils ?? '—'}</span>
+              <span>sep {pythonRuntime.packages.sep ?? '—'}</span>
+            </div>
+          ) : (
+            <div className="text-xs text-slate-500">正在探测本地科学计算栈...</div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCreateComp((v) => !v)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>新建独立组件</span>
+        </button>
+      </div>
+
+      {/* Create New Component Drawer */}
+      {showCreateComp && (
+        <form
+          onSubmit={handleCreateComponent}
+          className="bg-white border border-blue-200 rounded-md p-5 space-y-4 text-xs"
+        >
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <span className="text-sm font-semibold text-slate-900">
+              新建独立磁盘组件（持久化至 workspace/components/&lt;id&gt;/v0.1/）
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowCreateComp(false)}
+              className="text-slate-500 hover:text-slate-800 cursor-pointer"
+            >
+              关闭
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">组件 ID (kebab-case)</label>
+              <input
+                type="text"
+                required
+                placeholder="如 fits-snr-auditor"
+                value={newCompId}
+                onChange={(e) => setNewCompId(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">组件显示名称</label>
+              <input
+                type="text"
+                required
+                placeholder="如 FITS 信噪比统计审计器"
+                value={newCompName}
+                onChange={(e) => setNewCompName(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded"
+              />
+            </div>
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">组件类别</label>
+              <select
+                value={newCompKind}
+                onChange={(e) => setNewCompKind(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-mono"
+              >
+                <option value="analysis_plugin">analysis_plugin (独立分析)</option>
+                <option value="evaluator">evaluator (评价准则)</option>
+                <option value="optical_solver">optical_solver (光学求解器)</option>
+                <option value="fits_analyzer">fits_analyzer (观测解析)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">执行环境</label>
+              <select
+                value={newCompRuntime}
+                onChange={(e) => {
+                  const rt = e.target.value as 'local_process_mjs' | 'local_process_py';
+                  setNewCompRuntime(rt);
+                  if (rt === 'local_process_py') {
+                    setNewCompCode(
+`import sys, json
+
+if '--check' in sys.argv:
+    print(json.dumps({"ok": True, "summary": "Python 自定义组件自检通过"}))
+    sys.exit(0)
+
+print(json.dumps({"ok": True, "note": "custom python component ready"}))
+`
+                    );
+                  }
+                }}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-mono"
+              >
+                <option value="local_process_mjs">Node.js 子进程 (.mjs)</option>
+                <option value="local_process_py">Python 子进程 (.py)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">能力定位与物理边界说明</label>
+            <input
+              type="text"
+              placeholder="说明该组件的输入契约、计算假设与物理边界..."
+              value={newCompSummary}
+              onChange={(e) => setNewCompSummary(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded"
+            />
+          </div>
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">初始实现源码</label>
+            <textarea
+              rows={7}
+              required
+              value={newCompCode}
+              onChange={(e) => setNewCompCode(e.target.value)}
+              className="w-full p-3 bg-slate-900 text-slate-100 font-mono text-xs rounded border border-slate-700"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateComp(false)}
+              className="px-3 py-1.5 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded cursor-pointer"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={creatingComp}
+              className="px-4 py-1.5 font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded cursor-pointer"
+            >
+              {creatingComp ? '写入磁盘中...' : '创建组件并登记哈希'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[330px_1fr] gap-6 items-start">
       {/* Left Component Directory */}
       <aside className="bg-white border border-slate-200 rounded-md overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
@@ -793,6 +1001,7 @@ export function ComponentLibrary({
       ) : (
         <div className="p-8 text-sm text-slate-500">请选择左侧组件查看其结构档案。</div>
       )}
+      </div>
     </div>
   );
 }

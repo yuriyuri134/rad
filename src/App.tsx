@@ -1,19 +1,37 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
+  ArtifactRef,
+  AsyncJobRecord,
   ComponentDossier,
+  EpistemicNote,
+  EpistemicTag,
   ExperimentRun,
+  FitsCatalogEntry,
+  FitsSourceDetection,
   OpticalSystemSpec,
+  P2RunnerMode,
+  ResearchStudy,
   RuntimeEnvironmentSnapshot,
   SourceOrigin,
+  StudyBranch,
   ThreadEntry,
+  WorkflowExecution,
 } from './core/types.ts';
 import { TopBar, type WorkspaceTab } from './components/TopBar.tsx';
-import { ExperimentWorkspace } from './components/ExperimentWorkspace.tsx';
+import { ResearchStudio, type DiscoveredPythonRuntime } from './components/ResearchStudio.tsx';
+import { ArtifactsAndCompareView, type CompareSubTab } from './components/ArtifactsAndCompareView.tsx';
 import { ComponentLibrary } from './components/ComponentLibrary.tsx';
-import { RunComparison } from './components/RunComparison.tsx';
 import { ArchitectureMapView } from './components/ArchitectureMapView.tsx';
 
-interface BootstrapPayload {
+interface WorkbenchBootstrapPayload {
+  studies: ResearchStudy[];
+  branches: StudyBranch[];
+  executions: WorkflowExecution[];
+  artifacts: ArtifactRef[];
+  notes: EpistemicNote[];
+  jobs: AsyncJobRecord[];
+  fitsCatalog: FitsCatalogEntry[];
+  pythonRuntime: DiscoveredPythonRuntime;
   components: ComponentDossier[];
   runs: ExperimentRun[];
   thread: ThreadEntry[];
@@ -27,17 +45,41 @@ interface BootstrapPayload {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('experiment');
+  const [compareSubTab, setCompareSubTab] = useState<CompareSubTab>('matrix');
+  const [selectedFitsPath, setSelectedFitsPath] = useState<string | null>(null);
+
+  // V2 Study & Execution state
+  const [studies, setStudies] = useState<ResearchStudy[]>([]);
+  const [selectedStudyId, setSelectedStudyId] = useState<string>('study-wf-rc-1000');
+  const [branches, setBranches] = useState<StudyBranch[]>([]);
+  const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
+  const [artifacts, setArtifacts] = useState<ArtifactRef[]>([]);
+  const [notes, setNotes] = useState<EpistemicNote[]>([]);
+  const [jobs, setJobs] = useState<AsyncJobRecord[]>([]);
+  const [activeJob, setActiveJob] = useState<AsyncJobRecord | null>(null);
+  const [fitsCatalog, setFitsCatalog] = useState<FitsCatalogEntry[]>([]);
+  const [pythonRuntime, setPythonRuntime] = useState<DiscoveredPythonRuntime | null>(null);
+  const [pythonFitsResult, setPythonFitsResult] = useState<{
+    extractor: string;
+    fitsPath: string;
+    detectedSources: FitsSourceDetection[];
+    medianSkyAdu?: number;
+    skyNoiseSigmaAdu?: number;
+    medianFwhmPx?: number | null;
+    medianFwhmArcsec?: number | null;
+  } | null>(null);
+
+  // Legacy P1 state (preserved read/append compatible)
   const [components, setComponents] = useState<ComponentDossier[]>([]);
   const [runs, setRuns] = useState<ExperimentRun[]>([]);
   const [thread, setThread] = useState<ThreadEntry[]>([]);
-  const [presets, setPresets] = useState<BootstrapPayload['presets'] | null>(null);
+  const [presets, setPresets] = useState<WorkbenchBootstrapPayload['presets'] | null>(null);
   const [aiAvailable, setAiAvailable] = useState(false);
   const [runtimeEnv, setRuntimeEnv] = useState<RuntimeEnvironmentSnapshot | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Active experiment workbench state
   const [systemSpec, setSystemSpec] = useState<OpticalSystemSpec | null>(null);
   const [specEpoch, setSpecEpoch] = useState(0);
   const [selectedSolverId, setSelectedSolverId] = useState('solver-ts-preview');
@@ -45,10 +87,12 @@ export default function App() {
   const [selectedEvaluatorId, setSelectedEvaluatorId] = useState('eval-rms-spot');
   const [runMode, setRunMode] = useState<'solve_only' | 'optimize'>('optimize');
   const [seed, setSeed] = useState<number>(42);
-  const [intentText, setIntentText] = useState('用当前优化策略与评价标准调整曲率半径，观察光斑与焦距变化');
+  const [intentText, setIntentText] = useState(
+    '用当前优化策略与评价标准调整曲率半径，观察光斑与焦距变化',
+  );
   const [branchLabel, setBranchLabel] = useState('主线优化尝试');
-  const [isRunning, setIsRunning] = useState(false);
-  const [runError, setRunError] = useState<string | null>(null);
+  const [isP1Running, setIsP1Running] = useState(false);
+  const [p1RunError, setP1RunError] = useState<string | null>(null);
 
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [archFocusNodeId, setArchFocusNodeId] = useState<string | null>(null);
@@ -60,16 +104,34 @@ export default function App() {
 
   const fetchBootstrap = useCallback(async () => {
     try {
-      const res = await fetch('/api/bootstrap');
-      const data = (await res.json()) as BootstrapPayload & { error?: string };
-      if (!res.ok) throw new Error(data.error || '加载工作台失败');
+      const res = await fetch('/api/workbench/bootstrap');
+      const data = (await res.json()) as WorkbenchBootstrapPayload & { error?: string };
+      if (!res.ok) throw new Error(data.error || '加载开放科研工作台失败');
+
+      setStudies(data.studies);
+      setBranches(data.branches);
+      setExecutions(data.executions);
+      setArtifacts(data.artifacts);
+      setNotes(data.notes);
+      setJobs(data.jobs);
+      setFitsCatalog(data.fitsCatalog);
+      setPythonRuntime(data.pythonRuntime);
+
+      setSelectedStudyId((prev) =>
+        data.studies.some((s) => s.id === prev)
+          ? prev
+          : data.studies.find((s) => s.id === 'study-wf-rc-1000')?.id ?? data.studies[0]?.id ?? '',
+      );
+
       setComponents(data.components);
       setRuns(data.runs);
       setThread(data.thread);
       setPresets(data.presets);
       setAiAvailable(data.aiAvailable);
       setRuntimeEnv(data.runtimeEnv);
-      setSystemSpec((prev) => prev ?? data.runs[data.runs.length - 1]?.systemAfter ?? data.presets.singlet);
+      setSystemSpec(
+        (prev) => prev ?? data.runs[data.runs.length - 1]?.systemAfter ?? data.presets.singlet,
+      );
       setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
@@ -82,11 +144,201 @@ export default function App() {
     fetchBootstrap();
   }, [fetchBootstrap]);
 
-  const handleExecuteRun = async (parentRunId: string | null): Promise<ExperimentRun | null> => {
+  // Poll running async Python jobs
+  useEffect(() => {
+    if (!activeJob || (activeJob.status !== 'running' && activeJob.status !== 'queued')) {
+      return;
+    }
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(activeJob.id)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { job: AsyncJobRecord };
+        setActiveJob(data.job);
+        if (data.job.status !== 'running' && data.job.status !== 'queued') {
+          await fetchBootstrap();
+        }
+      } catch {
+        // Ignore transient network poll error
+      }
+    }, 700);
+    return () => window.clearInterval(timer);
+  }, [activeJob?.id, activeJob?.status, fetchBootstrap]);
+
+  // When a fits_star_extract execution finishes, pull its parsed output JSON so FitsWorkspace can overlay the exact Python detections
+  useEffect(() => {
+    if (!activeJob || activeJob.status !== 'completed' || activeJob.runnerMode !== 'fits_star_extract') {
+      return;
+    }
+    const exec = executions.find((e) => e.id === activeJob.resultExecutionId);
+    const outArtId = activeJob.resultArtifactIds[0];
+    const art = artifacts.find((a) => a.id === outArtId);
+    if (!art && !exec) return;
+
+    // Fetch exact output payload via artifacts relative path if served, or reload job log metadata
+    if (exec) {
+      fetch(`/api/jobs/${encodeURIComponent(activeJob.id)}`)
+        .then((r) => r.json())
+        .then(async (payload) => {
+          const j = payload.job as AsyncJobRecord;
+          if (!j.resultArtifactIds[0]) return;
+          // Note: pythonFitsResult uses the detections from execution or artifact endpoint
+          const artRes = await fetch(`/api/fits/inspect-artifact?artifactId=${encodeURIComponent(j.resultArtifactIds[0])}`);
+          if (artRes.ok) {
+            const parsed = await artRes.json();
+            if (Array.isArray(parsed.detectedSources)) {
+              setPythonFitsResult({
+                extractor: String(parsed.extractor ?? j.parameters.extractor ?? 'photutils_DAOStarFinder'),
+                fitsPath: String(parsed.fitsPath ?? j.parameters.fitsPath ?? ''),
+                detectedSources: parsed.detectedSources as FitsSourceDetection[],
+                medianSkyAdu: typeof parsed.medianSkyAdu === 'number' ? parsed.medianSkyAdu : undefined,
+                skyNoiseSigmaAdu:
+                  typeof parsed.skyNoiseSigmaAdu === 'number' ? parsed.skyNoiseSigmaAdu : undefined,
+                medianFwhmPx: parsed.medianFwhmPx ?? null,
+                medianFwhmArcsec: parsed.medianFwhmArcsec ?? null,
+              });
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeJob?.id, activeJob?.status, executions, artifacts]);
+
+  const handleStartAsyncJob = async (payload: {
+    studyId: string;
+    parentBranchId: string;
+    runnerMode: P2RunnerMode;
+    title: string;
+    intent: string;
+    branchName: string;
+    hypothesis: string;
+    parameters: Record<string, unknown>;
+    timeoutMs: number;
+  }): Promise<AsyncJobRecord | null> => {
+    const res = await fetch('/api/jobs/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || '启动异步计算失败');
+    }
+    setActiveJob(data.job as AsyncJobRecord);
+    return data.job as AsyncJobRecord;
+  };
+
+  const handleCancelAsyncJob = async (jobId: string) => {
+    const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: 'POST',
+    });
+    const data = await res.json();
+    if (res.ok && data.job) {
+      setActiveJob(data.job as AsyncJobRecord);
+      await fetchBootstrap();
+    }
+  };
+
+  const handleAdoptBranch = async (studyId: string, branchId: string, reason?: string) => {
+    const res = await fetch(
+      `/api/studies/${encodeURIComponent(studyId)}/branches/${encodeURIComponent(branchId)}/adopt`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '采纳分支失败');
+    await fetchBootstrap();
+  };
+
+  const handleCreateStudy = async (payload: {
+    title: string;
+    domain: string;
+    problemStatement: string;
+    backgroundContext?: string;
+    initialHypothesis?: string;
+  }) => {
+    const res = await fetch('/api/studies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '新建课题失败');
+    await fetchBootstrap();
+    setSelectedStudyId(data.study.id);
+    setActiveTab('experiment');
+  };
+
+  const handleAddOpenQuestion = async (studyId: string, question: string) => {
+    const res = await fetch(`/api/studies/${encodeURIComponent(studyId)}/open-questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+    if (res.ok) await fetchBootstrap();
+  };
+
+  const handleAddEpistemicNote = async (payload: {
+    studyId: string;
+    branchId: string | null;
+    tag: EpistemicTag;
+    title: string;
+    content: string;
+    evidenceRefs?: string[];
+  }) => {
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) await fetchBootstrap();
+  };
+
+  const handleAskAiCollaborator = async (studyId: string, question: string) => {
+    const res = await fetch('/api/ai/collaborate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studyId, question }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'AI 研判请求失败');
+    await fetchBootstrap();
+  };
+
+  const handleTriggerPythonExtractFromFits = async (params: {
+    fitsPath: string;
+    extractor: 'photutils_DAOStarFinder' | 'sep_extract';
+    fwhmPx: number;
+    thresholdSigma: number;
+    apertureRadiusPx: number;
+  }) => {
+    const wfStudy = studies.find((s) => s.id === 'study-wf-rc-1000') ?? studies[0];
+    if (!wfStudy) return;
+    setSelectedFitsPath(params.fitsPath);
+    const parentId = wfStudy.adoptedBranchId || 'branch-p2-s3';
+    await handleStartAsyncJob({
+      studyId: wfStudy.id,
+      parentBranchId: parentId,
+      runnerMode: 'fits_star_extract',
+      title: `FITS 查看器实算 (${params.extractor}, FWHM=${params.fwhmPx}px)`,
+      intent: `从 2D FITS 检查器发起真实 Python 提取: ${params.fitsPath.split('/').pop()}`,
+      branchName: `FITS 检查 (${params.extractor}, fwhm=${params.fwhmPx}px)`,
+      hypothesis: `验证 FWHM=${params.fwhmPx}px、阈值 ${params.thresholdSigma}σ 下的真实检测源分布`,
+      parameters: params,
+      timeoutMs: 25000,
+    });
+    setActiveTab('experiment');
+  };
+
+  // Legacy P1 handlers
+  const handleExecuteP1Run = async (parentRunId: string | null): Promise<ExperimentRun | null> => {
     if (!systemSpec) return null;
     const launchEpoch = specEpoch;
-    setIsRunning(true);
-    setRunError(null);
+    setIsP1Running(true);
+    setP1RunError(null);
     try {
       const res = await fetch('/api/experiments/run', {
         method: 'POST',
@@ -115,22 +367,18 @@ export default function App() {
         }
         return cur;
       });
+      await fetchBootstrap();
       return data.run as ExperimentRun;
     } catch (err) {
-      setRunError(err instanceof Error ? err.message : String(err));
+      setP1RunError(err instanceof Error ? err.message : String(err));
       return null;
     } finally {
-      setIsRunning(false);
+      setIsP1Running(false);
     }
   };
 
-  const handleQuickRunFromTopBar = async () => {
-    setActiveTab('experiment');
-    await handleExecuteRun(runs[runs.length - 1]?.id ?? null);
-  };
-
-  const handleReevaluateRun = async (runId: string, evaluatorId: string) => {
-    setRunError(null);
+  const handleReevaluateP1Run = async (runId: string, evaluatorId: string) => {
+    setP1RunError(null);
     const res = await fetch(`/api/experiments/${encodeURIComponent(runId)}/reevaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -138,14 +386,14 @@ export default function App() {
     });
     const data = await res.json();
     if (!res.ok) {
-      setRunError(data.error || '重评失败');
+      setP1RunError(data.error || '重评失败');
       return;
     }
     setRuns((prev) => prev.map((r) => (r.id === runId ? (data.run as ExperimentRun) : r)));
     setThread((prev) => [...prev, data.entry as ThreadEntry]);
   };
 
-  const handleAddNote = async (
+  const handleAddP1Note = async (
     origin: SourceOrigin,
     title: string,
     content: string,
@@ -162,29 +410,21 @@ export default function App() {
     }
   };
 
-  const handleRequestAiCritique = async (question: string) => {
+  const handleRequestP1AiCritique = async (question: string) => {
     const res = await fetch('/api/ai/critique', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
     });
     const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'AI 协作请求失败');
-    }
+    if (!res.ok) throw new Error(data.error || 'AI 协作请求失败');
     if (data.entry) {
       setThread((prev) => [...prev, data.entry as ThreadEntry]);
     }
   };
 
-  const handleInspectComponent = (id: string) => {
-    setSelectedComponentId(id);
-    setActiveTab('components');
-  };
-
-  const handleInspectInArchitecture = (nodeId: string) => {
-    setArchFocusNodeId(nodeId);
-    setActiveTab('architecture');
+  const handleTopBarPrimaryAction = () => {
+    setActiveTab('experiment');
   };
 
   const handleJumpFromArchitecture = (target: {
@@ -194,23 +434,30 @@ export default function App() {
     if (target.tab === 'components') {
       setSelectedComponentId(target.targetId);
     }
+    if (target.targetId.startsWith('study:')) {
+      setSelectedStudyId(target.targetId.replace(/^study:/, ''));
+    } else if (target.targetId.startsWith('branch:')) {
+      const bId = target.targetId.replace(/^branch:/, '');
+      const b = branches.find((x) => x.id === bId);
+      if (b) setSelectedStudyId(b.studyId);
+    }
     setActiveTab(target.tab);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-slate-600 font-mono">
-        正在加载 OpenLab Bench 与组件档案...
+        正在初始化 OpenLab Bench 开放科研工作台与 WF-RC-1000 证据账本...
       </div>
     );
   }
 
-  if (loadError || !presets || !systemSpec || !runtimeEnv) {
+  if (loadError || !presets || !systemSpec || !runtimeEnv || !pythonRuntime) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="max-w-md bg-white border border-rose-200 rounded-md p-6 space-y-3 text-sm">
           <div className="font-semibold text-rose-800">工作台初始化失败</div>
-          <p className="text-slate-600">{loadError || '缺少预设光学配置或运行环境信息'}</p>
+          <p className="text-slate-600">{loadError || '缺少课题或运行环境数据'}</p>
           <button
             type="button"
             onClick={fetchBootstrap}
@@ -223,18 +470,53 @@ export default function App() {
     );
   }
 
+  const activeStudy = studies.find((s) => s.id === selectedStudyId) ?? studies[0];
+  const activeBranches = branches.filter((b) => b.studyId === activeStudy?.id);
+  const activeExecutions = executions.filter((e) => e.studyId === activeStudy?.id);
+  const activeArtifacts = artifacts.filter((a) => a.studyId === activeStudy?.id);
+
+  const isJobRunning = activeJob?.status === 'running' || activeJob?.status === 'queued';
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       <TopBar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
-        onQuickRun={handleQuickRunFromTopBar}
-        isRunning={isRunning}
+        onPrimaryAction={handleTopBarPrimaryAction}
+        activeJob={activeJob}
+        isBusy={isP1Running}
       />
 
-      <div className="flex-1">
+      <main className="flex-1">
         {activeTab === 'experiment' && (
-          <ExperimentWorkspace
+          <ResearchStudio
+            studies={studies}
+            selectedStudyId={selectedStudyId}
+            onSelectStudyId={setSelectedStudyId}
+            branches={branches}
+            executions={executions}
+            artifacts={artifacts}
+            notes={notes}
+            fitsCatalog={fitsCatalog}
+            pythonRuntime={pythonRuntime}
+            activeJob={activeJob}
+            jobs={jobs}
+            onStartAsyncJob={handleStartAsyncJob}
+            onCancelAsyncJob={handleCancelAsyncJob}
+            onAdoptBranch={handleAdoptBranch}
+            onCreateStudy={handleCreateStudy}
+            onAddOpenQuestion={handleAddOpenQuestion}
+            onAddEpistemicNote={handleAddEpistemicNote}
+            onAskAiCollaborator={handleAskAiCollaborator}
+            onNavigateToCompare={(sub, fitsP) => {
+              if (sub) setCompareSubTab(sub);
+              if (fitsP) setSelectedFitsPath(fitsP);
+              setActiveTab('compare');
+            }}
+            onInspectInArchitecture={(nodeId) => {
+              setArchFocusNodeId(nodeId);
+              setActiveTab('architecture');
+            }}
             components={components}
             runs={runs}
             thread={thread}
@@ -257,14 +539,35 @@ export default function App() {
             onChangeIntentText={setIntentText}
             branchLabel={branchLabel}
             onChangeBranchLabel={setBranchLabel}
-            onExecuteRun={handleExecuteRun}
-            isRunning={isRunning}
-            runError={runError}
-            onInspectComponent={handleInspectComponent}
-            onInspectInArchitecture={handleInspectInArchitecture}
-            onReevaluateRun={handleReevaluateRun}
-            onAddNote={handleAddNote}
-            onRequestAiCritique={handleRequestAiCritique}
+            onExecuteP1Run={handleExecuteP1Run}
+            isP1Running={isP1Running}
+            p1RunError={p1RunError}
+            onInspectComponent={(id) => {
+              setSelectedComponentId(id);
+              setActiveTab('components');
+            }}
+            onReevaluateP1Run={handleReevaluateP1Run}
+            onAddP1Note={handleAddP1Note}
+            onRequestP1AiCritique={handleRequestP1AiCritique}
+          />
+        )}
+
+        {activeTab === 'compare' && activeStudy && (
+          <ArtifactsAndCompareView
+            study={activeStudy}
+            branches={activeBranches}
+            executions={activeExecutions}
+            artifacts={activeArtifacts}
+            fitsCatalog={fitsCatalog}
+            legacyRuns={runs}
+            activeSubTab={compareSubTab}
+            onChangeSubTab={setCompareSubTab}
+            initialFitsPath={selectedFitsPath}
+            pythonFitsResult={pythonFitsResult}
+            onAdoptBranch={handleAdoptBranch}
+            onSelectFitsPath={(p) => setSelectedFitsPath(p)}
+            onTriggerPythonExtract={handleTriggerPythonExtractFromFits}
+            isJobRunning={isJobRunning}
           />
         )}
 
@@ -274,12 +577,14 @@ export default function App() {
             runs={runs}
             selectedId={selectedComponentId}
             onSelectId={setSelectedComponentId}
-            onInspectInArchitecture={handleInspectInArchitecture}
+            onInspectInArchitecture={(nodeId) => {
+              setArchFocusNodeId(nodeId);
+              setActiveTab('architecture');
+            }}
             onRefresh={fetchBootstrap}
+            pythonRuntime={pythonRuntime}
           />
         )}
-
-        {activeTab === 'compare' && <RunComparison runs={runs} />}
 
         {activeTab === 'architecture' && (
           <ArchitectureMapView
@@ -287,7 +592,7 @@ export default function App() {
             onJumpToTarget={handleJumpFromArchitecture}
           />
         )}
-      </div>
+      </main>
     </div>
   );
 }

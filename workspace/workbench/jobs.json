@@ -1,0 +1,91 @@
+[
+  {
+    "id": "job-mwm6gdak-kblb",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": "branch-p2-s3",
+    "runnerMode": "fits_batch_completeness",
+    "title": "批量 FITS 欠采样横评 (S1_S4, FWHM=1.5px)",
+    "intent": "在 S1_S4 真实 FITS 瓦片上批量比对 Photutils DAO(fwhm=1.5px) 与 SEP 交叉匹配率及假阳性余项",
+    "branchName": "S1-S4 16帧批量 FITS 欠采样横评",
+    "hypothesis": "跨 S1–S4 全部视场与像斑尺度验证 DAO(fwhm=1.5px) 与 SEP 的交叉匹配率，同时检查假阳性余项。",
+    "status": "completed",
+    "timeoutMs": 40000,
+    "parameters": {
+      "systemKeys": [
+        "S1_2Lens_FS_RC",
+        "S2_3Lens_Wynne_FS_RC",
+        "S3_3Lens_Wynne_FS_QuasiRC",
+        "S4_3Lens_Wynne_FS_F2_RC"
+      ],
+      "fwhmPx": 1.5,
+      "thresholdSigma": 4.5,
+      "sepThresholdSigma": 4.5,
+      "sepMinArea": 4,
+      "matchRadiusPx": 3.5
+    },
+    "logs": [
+      "[2026-11-18T13:49:02.156Z] 初始化作业 job-mwm6gdak-kblb (mode=fits_batch_completeness, timeout=40s)",
+      "[2026-11-18T13:49:02.156Z] 选用科学 Python 运行时: /tmp/p2_venv/bin/python (Optiland 0.6.3, Astropy 8.0.3, Photutils 3.1.1, SEP 1.4.1)",
+      "[openlab-py] 开始批量 FITS 欠采样横评: 16 帧, DAOStarFinder(fwhm=1.5px, thresh=4.5σ) vs SEP(minarea=4)...",
+      "[openlab-py]   S1_2Lens_FS_RC 0.00°: DAO(1.5px)=28, SEP=28, 交叉匹配=27 (96.4% vs SEP, Stage3 DAO3px=78.6%)",
+      "[openlab-py]   S1_2Lens_FS_RC 0.25°: DAO(1.5px)=27, SEP=28, 交叉匹配=25 (89.3% vs SEP, Stage3 DAO3px=67.9%)",
+      "[openlab-py]   S1_2Lens_FS_RC 0.42°: DAO(1.5px)=25, SEP=28, 交叉匹配=25 (89.3% vs SEP, Stage3 DAO3px=60.7%)",
+      "[openlab-py]   S1_2Lens_FS_RC 0.60°: DAO(1.5px)=22, SEP=25, 交叉匹配=21 (84.0% vs SEP, Stage3 DAO3px=64.3%)",
+      "[openlab-py]   S2_3Lens_Wynne_FS_RC 0.00°: DAO(1.5px)=27, SEP=28, 交叉匹配=26 (92.9% vs SEP, Stage3 DAO3px=67.9%)",
+      "[openlab-py]   S2_3Lens_Wynne_FS_RC 0.25°: DAO(1.5px)=28, SEP=28, 交叉匹配=24 (85.7% vs SEP, Stage3 DAO3px=42.9%)",
+      "[openlab-py]   S2_3Lens_Wynne_FS_RC 0.42°: DAO(1.5px)=26, SEP=28, 交叉匹配=25 (89.3% vs SEP, Stage3 DAO3px=60.7%)",
+      "[openlab-py]   S2_3Lens_Wynne_FS_RC 0.60°: DAO(1.5px)=23, SEP=26, 交叉匹配=21 (80.8% vs SEP, Stage3 DAO3px=50.0%)",
+      "[openlab-py]   S3_3Lens_Wynne_FS_QuasiRC 0.00°: DAO(1.5px)=28, SEP=28, 交叉匹配=25 (89.3% vs SEP, Stage3 DAO3px=67.9%)",
+      "[openlab-py]   S3_3Lens_Wynne_FS_QuasiRC 0.25°: DAO(1.5px)=23, SEP=28, 交叉匹配=20 (71.4% vs SEP, Stage3 DAO3px=50.0%)",
+      "[openlab-py]   S3_3Lens_Wynne_FS_QuasiRC 0.42°: DAO(1.5px)=19, SEP=28, 交叉匹配=19 (67.9% vs SEP, Stage3 DAO3px=50.0%)",
+      "[openlab-py]   S3_3Lens_Wynne_FS_QuasiRC 0.60°: DAO(1.5px)=23, SEP=27, 交叉匹配=21 (77.8% vs SEP, Stage3 DAO3px=42.9%)",
+      "[openlab-py]   S4_3Lens_Wynne_FS_F2_RC 0.00°: DAO(1.5px)=31, SEP=28, 交叉匹配=28 (100.0% vs SEP, Stage3 DAO3px=100.0%)",
+      "[openlab-py]   S4_3Lens_Wynne_FS_F2_RC 0.25°: DAO(1.5px)=33, SEP=28, 交叉匹配=28 (100.0% vs SEP, Stage3 DAO3px=82.1%)",
+      "[openlab-py]   S4_3Lens_Wynne_FS_F2_RC 0.42°: DAO(1.5px)=27, SEP=28, 交叉匹配=27 (96.4% vs SEP, Stage3 DAO3px=75.0%)",
+      "[openlab-py]   S4_3Lens_Wynne_FS_F2_RC 0.60°: DAO(1.5px)=28, SEP=26, 交叉匹配=26 (100.0% vs SEP, Stage3 DAO3px=85.7%)",
+      "[openlab-py] 批量横评完成 (2471.1 ms): 16 帧均匹配率(vs SEP)=88.2% (Stage3 DAO3px均值=65.4%), 未匹配余项=30",
+      "[2026-11-18T13:49:04.918Z] 完成持久化：新分支 E6 · SHA-256=f11e2ea9414f..."
+    ],
+    "resultBranchId": "branch-wb-mwm6gffc",
+    "resultExecutionId": "exec-wb-mwm6gffc",
+    "resultArtifactIds": [
+      "art-exec-wb-mwm6gffc-json",
+      "art-exec-wb-mwm6gffc-log"
+    ],
+    "errorMessage": null,
+    "startedAt": "2026-11-18T13:49:02.156Z",
+    "finishedAt": "2026-11-18T13:49:04.918Z",
+    "durationMs": 2762
+  },
+  {
+    "id": "job-mwm6qwh5-b2n2",
+    "studyId": "study-wf-rc-1000",
+    "parentBranchId": "branch-p2-s4",
+    "runnerMode": "wf_rc_s4_reopt_probe",
+    "title": "实测：S4 (FS+F2+FS) 解锁 K1/K2 多起点诊断重优化",
+    "intent": "在 Optiland 0.6.3 中用受控评估预算运行 S4 多起点与圆锥解锁重优化，与原 S4 (9.704 μm) 及 S3 (1.063 μm) 直接对照",
+    "branchName": "S4-多起点与圆锥解锁诊断优化分支",
+    "hypothesis": "解锁 Quasi-RC 圆锥系数并更换初始起点可使 S4 逃离 Stage 2 cost=597.635 局部极小并检验其真实色差物理极限。",
+    "status": "running",
+    "timeoutMs": 150000,
+    "parameters": {
+      "strategy": "unlock_conics_multi_seed",
+      "maxNfev": 25,
+      "numRaysOpt": 4,
+      "evalNumRays": 12
+    },
+    "logs": [
+      "[2026-11-18T13:57:13.577Z] 初始化作业 job-mwm6qwh5-b2n2 (mode=wf_rc_s4_reopt_probe, timeout=150s)",
+      "[2026-11-18T13:57:13.577Z] 选用科学 Python 运行时: /tmp/p2_venv/bin/python (Optiland 0.6.3, Astropy 8.0.3, Photutils 3.1.1, SEP 1.4.1)",
+      "[openlab-py] 启动 S4 (Fused Silica + Schott F2 + Fused Silica) 诊断重优化: strategy=unlock_conics_multi_seed, maxNfev=25...",
+      "WARNING: No extinction coefficient data found for Malitson.yml. Assuming it is 0."
+    ],
+    "resultBranchId": null,
+    "resultExecutionId": null,
+    "resultArtifactIds": [],
+    "errorMessage": null,
+    "startedAt": "2026-11-18T13:57:13.577Z",
+    "finishedAt": null,
+    "durationMs": null
+  }
+]

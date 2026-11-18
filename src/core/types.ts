@@ -531,6 +531,24 @@ export interface FitsSourceDetection {
   apertureFlux: number;
   snrEstimate: number;
   fwhmPxEstimate: number;
+  raDeg?: number | null;
+  decDeg?: number | null;
+  fwhmArcsec?: number | null;
+  extractor?: 'ts_aperture' | 'photutils_DAOStarFinder' | 'sep_extract';
+}
+
+export interface FitsWcsInfo {
+  ctype1: string;
+  ctype2: string;
+  crval1: number;
+  crval2: number;
+  crpix1: number;
+  crpix2: number;
+  cdelt1: number;
+  cdelt2: number;
+  pixelScaleArcsec: number;
+  centerRaDeg: number;
+  centerDecDeg: number;
 }
 
 export interface FitsAnalysisResult {
@@ -552,6 +570,9 @@ export interface FitsAnalysisResult {
   madNoise: number;
   pixels: number[];
   detectedSources: FitsSourceDetection[];
+  wcs?: FitsWcsInfo | null;
+  extractorUsed?: string;
+  tileMeta?: Record<string, unknown>;
 }
 
 export type ArchRelationType =
@@ -564,12 +585,28 @@ export type ArchRelationType =
 
 export type ArchProvenance = 'scanned' | 'observed' | 'declared' | 'manual' | 'inferred';
 
+export type ProvenanceTier =
+  | 'historical_migrated'
+  | 'external_verified_import'
+  | 'workbench_native';
+
 export interface ArchNode {
   id: string;
   label: string;
-  kind: 'scope' | 'component' | 'subpart' | 'experiment_run' | 'source_module' | 'artifact_store';
+  kind:
+    | 'scope'
+    | 'component'
+    | 'subpart'
+    | 'experiment_run'
+    | 'source_module'
+    | 'artifact_store'
+    | 'research_study'
+    | 'branch'
+    | 'workflow_execution'
+    | 'runtime_host';
   parentId: string | null;
   provenance: ArchProvenance;
+  provenanceTier?: ProvenanceTier;
   evidence: string;
   status: 'healthy' | 'warning' | 'error' | 'unmapped' | 'unavailable';
   summary: string;
@@ -626,4 +663,206 @@ export interface ArchitectureSnapshotDiff {
   addedAnomalies: ArchAnomaly[];
   resolvedAnomalies: ArchAnomaly[];
 }
+
+// ============================================================================
+// OpenLab Bench v2 — Research Study, Multi-Branch Workflow, Async Jobs & Artifacts
+// ============================================================================
+
+export type EpistemicTag = 'fact' | 'judgment' | 'hypothesis' | 'proposal';
+
+export interface StudyStageRecord {
+  stageNumber: number;
+  title: string;
+  status: 'completed' | 'in_progress' | 'open';
+  summary: string;
+  keyFinding: string;
+  primaryArtifactIds: string[];
+}
+
+export interface StudyOpenQuestion {
+  id: string;
+  question: string;
+  status: 'open' | 'investigating' | 'resolved';
+  createdAt: string;
+  resolutionNote?: string;
+}
+
+export interface ResearchStudy {
+  id: string;
+  slug: string;
+  title: string;
+  domain: string;
+  status: 'active' | 'converged' | 'archived';
+  provenanceTier: ProvenanceTier;
+  problemStatement: string;
+  backgroundContext: string;
+  objectives: ResearchObjective[];
+  criteria: AcceptanceCriterion[];
+  openQuestions: StudyOpenQuestion[];
+  stages: StudyStageRecord[];
+  adoptedBranchId: string | null;
+  adoptedReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudyBranch {
+  id: string;
+  studyId: string;
+  parentBranchId: string | null;
+  name: string;
+  shortCode: string;
+  hypothesis: string;
+  status: 'baseline' | 'exploring' | 'adopted' | 'archived_blocked' | 'rejected';
+  provenanceTier: ProvenanceTier;
+  summary: string;
+  metrics: Record<string, number | string | boolean | null>;
+  prescription?: Record<string, unknown>;
+  artifactIds: string[];
+  executionIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface ArtifactRef {
+  id: string;
+  studyId: string;
+  branchId: string;
+  executionId: string | null;
+  kind:
+    | 'optical_prescription_json'
+    | 'tolerance_report_json'
+    | 'fits_image'
+    | 'astrometry_report_json'
+    | 'verification_report_md'
+    | 'ray_trace_json'
+    | 'execution_log';
+  title: string;
+  relativePath: string;
+  sha256: string;
+  byteLength: number | null;
+  provenanceTier: ProvenanceTier;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export type P2RunnerMode =
+  | 'wf_rc_perturb_eval'
+  | 'fits_star_extract'
+  | 'fits_batch_completeness'
+  | 'wf_rc_s4_reopt_probe';
+
+export interface WorkflowExecution {
+  id: string;
+  studyId: string;
+  branchId: string;
+  jobId: string | null;
+  runnerMode:
+    | 'p2_wf_rc_perturb_eval'
+    | 'p2_fits_star_extract'
+    | 'p2_fits_batch_completeness'
+    | 'p2_wf_rc_s4_reopt_probe'
+    | 'p1_ts_optical'
+    | 'p1_optiland_python'
+    | 'external_script_verified_import';
+  title: string;
+  intent: string;
+  status: 'completed' | 'failed' | 'cancelled';
+  provenanceTier: ProvenanceTier;
+  parameters: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  artifactIds: string[];
+  pythonExecutable?: string;
+  packageVersions?: Record<string, string | null>;
+  durationMs: number;
+  createdAt: string;
+  sha256Digest: string;
+}
+
+export interface AsyncJobRecord {
+  id: string;
+  studyId: string;
+  parentBranchId: string;
+  runnerMode: P2RunnerMode;
+  title: string;
+  intent: string;
+  branchName: string;
+  hypothesis: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
+  timeoutMs: number;
+  parameters: Record<string, unknown>;
+  logs: string[];
+  resultBranchId: string | null;
+  resultExecutionId: string | null;
+  resultArtifactIds: string[];
+  errorMessage: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+}
+
+export interface ProposedExperimentAction {
+  label: string;
+  studyId: string;
+  parentBranchId: string;
+  runnerMode: P2RunnerMode;
+  branchName: string;
+  hypothesis: string;
+  intent: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface EpistemicNote {
+  id: string;
+  studyId: string;
+  branchId: string | null;
+  tag: EpistemicTag;
+  authorType: 'human' | 'ai_deterministic' | 'ai_llm' | 'system_verifier';
+  authorLabel: string;
+  title: string;
+  content: string;
+  evidenceRefs: string[];
+  proposedAction?: ProposedExperimentAction | null;
+  createdAt: string;
+}
+
+export interface FitsCatalogEntry {
+  id: string;
+  studyId: string;
+  systemKey: string;
+  fieldDeg: number;
+  relativePath: string;
+  fileName: string;
+  byteLength: number;
+  sha256: string;
+  summaryMetrics?: {
+    skyRmsAdu?: number;
+    photutilsCompletenessPct?: number;
+    sepCompletenessPct?: number;
+    sepAstrometryRmsArcsec?: number | null;
+    sepMedianFwhmArcsec?: number | null;
+  };
+}
+
+export interface ArchitectureAnnotation {
+  id: string;
+  nodeId: string;
+  author: string;
+  tag: EpistemicTag;
+  note: string;
+  createdAt: string;
+}
+
+export interface PersistedArchitectureSnapshot {
+  id: string;
+  capturedAt: string;
+  reason: string;
+  nodeCount: number;
+  edgeCount: number;
+  anomalyCount: number;
+  mapDigestSha256: string;
+  mapData: ArchitectureMapData;
+}
+
 
