@@ -1,0 +1,465 @@
+{
+  "systems": {
+    "OffAxis_TMA": {
+      "real_raytrace": {
+        "ok": true,
+        "elapsed_s": 0.3991,
+        "summary": {
+          "n_rays": 271,
+          "y_mean_mm": 194.7068,
+          "y_std_mm": 8.730951
+        }
+      },
+      "spot_diagram": {
+        "ok": true,
+        "elapsed_s": 0.0534,
+        "summary": {
+          "rms_radius_mm": [
+            11.263734,
+            11.661256
+          ]
+        }
+      },
+      "paraxial_efl": {
+        "ok": false,
+        "elapsed_s": 0.0016,
+        "error": "UnsupportedParaxialGeometryError: paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).",
+        "full_error": "paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).\n  - [OBLIQUE_POWERED_MIRROR] surface 2: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.990268 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 3: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 19.5721 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 3: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured -0.898794 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 4: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 343.952 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 4: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.743145 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 5: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 344.807 vs tolerance 4.7e-08)\nReal ray tracing (optic.surfaces.trace) remains available for this geometry; a general vector paraxial model would be required for first-order analysis."
+      },
+      "wavefront_chief_ray": {
+        "ok": false,
+        "elapsed_s": 0.0024,
+        "error": "UnsupportedParaxialGeometryError: paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).",
+        "full_error": "paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).\n  - [OBLIQUE_POWERED_MIRROR] surface 2: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.990268 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 3: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 19.5721 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 3: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured -0.898794 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 4: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 343.952 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 4: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.743145 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 5: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 344.807 vs tolerance 4.7e-08)\nReal ray tracing (optic.surfaces.trace) remains available for this geometry; a general vector paraxial model would be required for first-order analysis."
+      },
+      "wavefront_centroid": {
+        "ok": true,
+        "elapsed_s": 0.0469,
+        "summary": {
+          "opd_rms_waves": 602.85422,
+          "opd_ptv_waves": 2948.63
+        }
+      },
+      "wavefront_best_fit": {
+        "ok": true,
+        "elapsed_s": 0.047,
+        "summary": {
+          "opd_rms_waves": 598.58383,
+          "opd_ptv_waves": 2778.20981
+        }
+      },
+      "fftpsf_chief_ray": {
+        "ok": false,
+        "elapsed_s": 0.0028,
+        "error": "UnsupportedParaxialGeometryError: paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).",
+        "full_error": "paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).\n  - [OBLIQUE_POWERED_MIRROR] surface 2: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.990268 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 3: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 19.5721 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 3: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured -0.898794 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 4: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 343.952 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 4: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.743145 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 5: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 344.807 vs tolerance 4.7e-08)\nReal ray tracing (optic.surfaces.trace) remains available for this geometry; a general vector paraxial model would be required for first-order analysis."
+      },
+      "fftpsf_centroid": {
+        "ok": true,
+        "elapsed_s": 0.0224,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.01903,
+          "psf_sum": 1003.9216
+        }
+      },
+      "fftpsf_best_fit": {
+        "ok": true,
+        "elapsed_s": 0.0182,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.02267,
+          "psf_sum": 1003.9216
+        }
+      },
+      "mmdft_psf_chief_ray": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "mmdft_psf_centroid": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "mmdft_psf_best_fit": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "huygens_psf_low": {
+        "ok": false,
+        "elapsed_s": 0.0014,
+        "error": "UnsupportedParaxialGeometryError: paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).",
+        "full_error": "paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).\n  - [OBLIQUE_POWERED_MIRROR] surface 2: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.990268 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 3: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 19.5721 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 3: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured -0.898794 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 4: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 343.952 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 4: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.743145 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 5: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 344.807 vs tolerance 4.7e-08)\nReal ray tracing (optic.surfaces.trace) remains available for this geometry; a general vector paraxial model would be required for first-order analysis."
+      },
+      "geom_mtf": {
+        "ok": false,
+        "elapsed_s": 0.001,
+        "error": "UnsupportedParaxialGeometryError: paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).",
+        "full_error": "paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).\n  - [OBLIQUE_POWERED_MIRROR] surface 2: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.990268 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 3: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 19.5721 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 3: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured -0.898794 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 4: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 343.952 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 4: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.743145 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 5: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 344.807 vs tolerance 4.7e-08)\nReal ray tracing (optic.surfaces.trace) remains available for this geometry; a general vector paraxial model would be required for first-order analysis."
+      },
+      "fft_mtf": {
+        "ok": false,
+        "elapsed_s": 0.0021,
+        "error": "UnsupportedParaxialGeometryError: paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).",
+        "full_error": "paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).\n  - [OBLIQUE_POWERED_MIRROR] surface 2: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.990268 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 3: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 19.5721 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 3: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured -0.898794 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 4: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 343.952 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 4: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.743145 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 5: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 344.807 vs tolerance 4.7e-08)\nReal ray tracing (optic.surfaces.trace) remains available for this geometry; a general vector paraxial model would be required for first-order analysis."
+      },
+      "huygens_mtf": {
+        "ok": false,
+        "elapsed_s": 0.0022,
+        "error": "UnsupportedParaxialGeometryError: paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).",
+        "full_error": "paraxial ray tracing is not supported for this geometry: the system lies outside the scalar folded paraxial domain (piecewise-centered legs joined by plane fold mirrors, powered surfaces normal to their local beam segment).\n  - [OBLIQUE_POWERED_MIRROR] surface 2: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.990268 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 3: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 19.5721 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 3: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured -0.898794 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 4: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 343.952 vs tolerance 4.7e-08)\n  - [OBLIQUE_POWERED_MIRROR] surface 4: powered mirror at oblique incidence is astigmatic; |axis . beam| must equal 1 (measured 0.743145 vs tolerance 1e-10)\n  - [NONCOLLINEAR_VERTEX_CHAIN] surface 5: vertex lies off the physical beam leg (transverse decenter); the scalar folded model has no transverse first-order coupling to carry it (measured 344.807 vs tolerance 4.7e-08)\nReal ray tracing (optic.surfaces.trace) remains available for this geometry; a general vector paraxial model would be required for first-order analysis."
+      },
+      "encircled_energy": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: EncircledEnergy.__init__() got an unexpected keyword argument 'num_rings'",
+        "full_error": "EncircledEnergy.__init__() got an unexpected keyword argument 'num_rings'"
+      },
+      "distortion_default": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'wavelength'",
+        "full_error": "Distortion.__init__() got an unexpected keyword argument 'wavelength'"
+      },
+      "distortion_centroid_ref": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'wavelength'",
+        "full_error": "Distortion.__init__() got an unexpected keyword argument 'wavelength'"
+      }
+    },
+    "Coaxial_Biased_TMA": {
+      "real_raytrace": {
+        "ok": true,
+        "elapsed_s": 0.0104,
+        "summary": {
+          "n_rays": 271,
+          "y_mean_mm": 0.1068,
+          "y_std_mm": 11.717774
+        }
+      },
+      "spot_diagram": {
+        "ok": true,
+        "elapsed_s": 0.0576,
+        "summary": {
+          "rms_radius_mm": [
+            17.56768,
+            17.554495,
+            17.515155
+          ]
+        }
+      },
+      "paraxial_efl": {
+        "ok": true,
+        "elapsed_s": 0.003,
+        "summary": {
+          "f2_mm": -750.8065,
+          "fno": -3.0032
+        }
+      },
+      "wavefront_chief_ray": {
+        "ok": true,
+        "elapsed_s": 0.0668,
+        "summary": {
+          "opd_rms_waves": 983.71811,
+          "opd_ptv_waves": 3237.0016
+        }
+      },
+      "wavefront_centroid": {
+        "ok": true,
+        "elapsed_s": 0.0473,
+        "summary": {
+          "opd_rms_waves": 933.77411,
+          "opd_ptv_waves": 3108.51936
+        }
+      },
+      "wavefront_best_fit": {
+        "ok": true,
+        "elapsed_s": 0.0561,
+        "summary": {
+          "opd_rms_waves": 4.18953,
+          "opd_ptv_waves": 18.29345
+        }
+      },
+      "fftpsf_chief_ray": {
+        "ok": true,
+        "elapsed_s": 0.0226,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.02752,
+          "psf_sum": 1003.9216
+        }
+      },
+      "fftpsf_centroid": {
+        "ok": true,
+        "elapsed_s": 0.0187,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.01601,
+          "psf_sum": 1003.9216
+        }
+      },
+      "fftpsf_best_fit": {
+        "ok": true,
+        "elapsed_s": 0.0183,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.01727,
+          "psf_sum": 1003.9216
+        }
+      },
+      "mmdft_psf_chief_ray": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "mmdft_psf_centroid": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "mmdft_psf_best_fit": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "huygens_psf_low": {
+        "ok": true,
+        "elapsed_s": 4.2757,
+        "summary": {
+          "shape": [
+            16,
+            16
+          ],
+          "strehl": 0.60326
+        }
+      },
+      "geom_mtf": {
+        "ok": true,
+        "elapsed_s": 0.1416,
+        "summary": {
+          "has_data": true
+        }
+      },
+      "fft_mtf": {
+        "ok": true,
+        "elapsed_s": 0.1177,
+        "summary": {
+          "has_data": true
+        }
+      },
+      "huygens_mtf": {
+        "ok": true,
+        "elapsed_s": 0.1978,
+        "summary": {
+          "has_data": true
+        }
+      },
+      "encircled_energy": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: EncircledEnergy.__init__() got an unexpected keyword argument 'num_rings'",
+        "full_error": "EncircledEnergy.__init__() got an unexpected keyword argument 'num_rings'"
+      },
+      "distortion_default": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'wavelength'",
+        "full_error": "Distortion.__init__() got an unexpected keyword argument 'wavelength'"
+      },
+      "distortion_centroid_ref": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'wavelength'",
+        "full_error": "Distortion.__init__() got an unexpected keyword argument 'wavelength'"
+      }
+    },
+    "RC_Plus_2Lens_Corrector": {
+      "real_raytrace": {
+        "ok": true,
+        "elapsed_s": 0.0322,
+        "summary": {
+          "n_rays": 271,
+          "y_mean_mm": 145.6246,
+          "y_std_mm": 5.557362
+        }
+      },
+      "spot_diagram": {
+        "ok": true,
+        "elapsed_s": 0.1839,
+        "summary": {
+          "rms_radius_mm": [
+            5.07439,
+            5.093381,
+            5.112427,
+            5.132011,
+            5.19802,
+            5.282735,
+            6.528549,
+            6.605991,
+            6.762922
+          ]
+        }
+      },
+      "paraxial_efl": {
+        "ok": true,
+        "elapsed_s": 0.0025,
+        "summary": {
+          "f2_mm": 7470.7443,
+          "fno": 7.4707
+        }
+      },
+      "wavefront_chief_ray": {
+        "ok": true,
+        "elapsed_s": 0.2678,
+        "summary": {
+          "opd_rms_waves": 133.12052,
+          "opd_ptv_waves": 561.86158
+        }
+      },
+      "wavefront_centroid": {
+        "ok": true,
+        "elapsed_s": 0.3125,
+        "summary": {
+          "opd_rms_waves": 178.72761,
+          "opd_ptv_waves": 769.0257
+        }
+      },
+      "wavefront_best_fit": {
+        "ok": true,
+        "elapsed_s": 0.2841,
+        "summary": {
+          "opd_rms_waves": 9.61802,
+          "opd_ptv_waves": 44.50278
+        }
+      },
+      "fftpsf_chief_ray": {
+        "ok": true,
+        "elapsed_s": 0.0333,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.02579,
+          "psf_sum": 1125.2747
+        }
+      },
+      "fftpsf_centroid": {
+        "ok": true,
+        "elapsed_s": 0.021,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.02982,
+          "psf_sum": 1125.2747
+        }
+      },
+      "fftpsf_best_fit": {
+        "ok": true,
+        "elapsed_s": 0.0206,
+        "summary": {
+          "shape": [
+            64,
+            64
+          ],
+          "strehl": 0.0376,
+          "psf_sum": 1125.2747
+        }
+      },
+      "mmdft_psf_chief_ray": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "mmdft_psf_centroid": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "mmdft_psf_best_fit": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "ValueError: num_rays must be at least 32 if image_size and pixel_pitch are not specified.",
+        "full_error": "num_rays must be at least 32 if image_size and pixel_pitch are not specified."
+      },
+      "huygens_psf_low": {
+        "ok": true,
+        "elapsed_s": 0.0951,
+        "summary": {
+          "shape": [
+            16,
+            16
+          ],
+          "strehl": 0.05721
+        }
+      },
+      "geom_mtf": {
+        "ok": true,
+        "elapsed_s": 0.1623,
+        "summary": {
+          "has_data": true
+        }
+      },
+      "fft_mtf": {
+        "ok": true,
+        "elapsed_s": 0.2177,
+        "summary": {
+          "has_data": true
+        }
+      },
+      "huygens_mtf": {
+        "ok": true,
+        "elapsed_s": 0.3616,
+        "summary": {
+          "has_data": true
+        }
+      },
+      "encircled_energy": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: EncircledEnergy.__init__() got an unexpected keyword argument 'num_rings'",
+        "full_error": "EncircledEnergy.__init__() got an unexpected keyword argument 'num_rings'"
+      },
+      "distortion_default": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'wavelength'",
+        "full_error": "Distortion.__init__() got an unexpected keyword argument 'wavelength'"
+      },
+      "distortion_centroid_ref": {
+        "ok": false,
+        "elapsed_s": 0.0,
+        "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'wavelength'",
+        "full_error": "Distortion.__init__() got an unexpected keyword argument 'wavelength'"
+      }
+    }
+  }
+}

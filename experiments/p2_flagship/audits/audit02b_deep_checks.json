@@ -1,0 +1,56 @@
+{
+  "OffAxis_TMA": {
+    "fftpsf_working_FNO": {
+      "ok": true,
+      "fno": 4.5167194731477505
+    },
+    "fftpsf_physical_extent_um": {
+      "ok": true,
+      "x_um": 77.01006701716915,
+      "y_um": 77.01006701716915
+    },
+    "mmdft_psf_32": {
+      "ok": true,
+      "shape": [
+        64,
+        64
+      ],
+      "strehl": 0.011741348900886113
+    },
+    "encircled_energy": {
+      "ok": false,
+      "error": "AttributeError: 'EncircledEnergy' object has no attribute 'ee'"
+    },
+    "distortion_centroid": {
+      "ok": false,
+      "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'reference_point'"
+    }
+  },
+  "RC_Corrector": {
+    "fftpsf_working_FNO": {
+      "ok": true,
+      "fno": 6.621916972348708
+    },
+    "fftpsf_physical_extent_um": {
+      "ok": true,
+      "x_um": 112.90368437854549,
+      "y_um": 112.90368437854549
+    },
+    "mmdft_psf_32": {
+      "ok": true,
+      "shape": [
+        64,
+        64
+      ],
+      "strehl": 0.012297849152596511
+    },
+    "encircled_energy": {
+      "ok": false,
+      "error": "AttributeError: 'EncircledEnergy' object has no attribute 'ee'"
+    },
+    "distortion_centroid": {
+      "ok": false,
+      "error": "TypeError: Distortion.__init__() got an unexpected keyword argument 'reference_point'"
+    }
+  }
+}

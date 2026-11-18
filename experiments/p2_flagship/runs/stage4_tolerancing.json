@@ -1,0 +1,230 @@
+{
+  "branch_id": "S3_3Lens_Wynne_FS_QuasiRC",
+  "tolerances_applied": {
+    "R1_mm": "+/- 1.5",
+    "R2_mm": "+/- 1.0",
+    "M1_M2_spacing_mm": "+/- 0.05",
+    "M2_tilt_arcsec": "+/- 20",
+    "M2_decenter_mm": "+/- 0.05",
+    "Corrector_axial_mm": "+/- 0.10",
+    "Corrector_tilt_arcsec": "+/- 60",
+    "Corrector_decenter_mm": "+/- 0.10",
+    "Lens_radius_rel": "+/- 0.1%",
+    "Lens_tc_gap_mm": "+/- 0.05"
+  },
+  "nominal": {
+    "comp_delta_bfl_mm": 0.0008,
+    "mean_rms_um": 1.042,
+    "max_rms_um": 1.079,
+    "rms_by_field_um": {
+      "center": 0.933,
+      "mid_0.42": 1.039,
+      "edge_+Y": 1.079,
+      "edge_-Y": 1.079,
+      "edge_+X": 1.079
+    },
+    "strehl_550_center": 0.9967,
+    "strehl_550_edge": 0.9819
+  },
+  "oat_sensitivities_bfl_12mm": [
+    {
+      "perturbation": "M1_R1_+1.5mm",
+      "uncomp_mean_rms_um": 353.687,
+      "comp_delta_bfl_mm": -5.4754,
+      "mean_rms_um": 4.181,
+      "max_rms_um": 4.461,
+      "rms_by_field_um": {
+        "center": 4.184,
+        "mid_0.42": 3.338,
+        "edge_+Y": 4.461,
+        "edge_-Y": 4.461,
+        "edge_+X": 4.461
+      },
+      "strehl_550_center": 0.9823,
+      "strehl_550_edge": 0.616,
+      "delta_max_rms_um": 3.382
+    },
+    {
+      "perturbation": "M2_R2_+1.0mm",
+      "uncomp_mean_rms_um": 93.311,
+      "comp_delta_bfl_mm": 1.4571,
+      "mean_rms_um": 1.533,
+      "max_rms_um": 1.969,
+      "rms_by_field_um": {
+        "center": 1.969,
+        "mid_0.42": 1.47,
+        "edge_+Y": 1.409,
+        "edge_-Y": 1.409,
+        "edge_+X": 1.409
+      },
+      "strehl_550_center": 0.9824,
+      "strehl_550_edge": 0.9576,
+      "delta_max_rms_um": 0.89
+    },
+    {
+      "perturbation": "M1_M2_spacing_+0.05mm",
+      "uncomp_mean_rms_um": 26.878,
+      "comp_delta_bfl_mm": -0.4145,
+      "mean_rms_um": 1.134,
+      "max_rms_um": 1.222,
+      "rms_by_field_um": {
+        "center": 0.859,
+        "mid_0.42": 1.146,
+        "edge_+Y": 1.222,
+        "edge_-Y": 1.222,
+        "edge_+X": 1.222
+      },
+      "strehl_550_center": 0.9981,
+      "strehl_550_edge": 0.9772,
+      "delta_max_rms_um": 0.143
+    },
+    {
+      "perturbation": "M2_tilt_20arcsec",
+      "uncomp_mean_rms_um": 2.016,
+      "comp_delta_bfl_mm": 0.0015,
+      "mean_rms_um": 2.029,
+      "max_rms_um": 2.241,
+      "rms_by_field_um": {
+        "center": 1.955,
+        "mid_0.42": 1.938,
+        "edge_+Y": 1.972,
+        "edge_-Y": 2.241,
+        "edge_+X": 2.039
+      },
+      "strehl_550_center": 0.9497,
+      "strehl_550_edge": 0.9027,
+      "delta_max_rms_um": 1.162
+    },
+    {
+      "perturbation": "M2_decenter_0.05mm",
+      "uncomp_mean_rms_um": 1.883,
+      "comp_delta_bfl_mm": 0.0041,
+      "mean_rms_um": 1.853,
+      "max_rms_um": 2.198,
+      "rms_by_field_um": {
+        "center": 1.868,
+        "mid_0.42": 1.559,
+        "edge_+Y": 1.751,
+        "edge_-Y": 2.198,
+        "edge_+X": 1.888
+      },
+      "strehl_550_center": 0.954,
+      "strehl_550_edge": 0.9811,
+      "delta_max_rms_um": 1.119
+    },
+    {
+      "perturbation": "Corrector_spacing_+0.10mm",
+      "uncomp_mean_rms_um": 6.631,
+      "comp_delta_bfl_mm": -0.1009,
+      "mean_rms_um": 1.052,
+      "max_rms_um": 1.078,
+      "rms_by_field_um": {
+        "center": 0.979,
+        "mid_0.42": 1.046,
+        "edge_+Y": 1.078,
+        "edge_-Y": 1.078,
+        "edge_+X": 1.078
+      },
+      "strehl_550_center": 0.9967,
+      "strehl_550_edge": 0.9807,
+      "delta_max_rms_um": -0.001
+    },
+    {
+      "perturbation": "Corrector_tilt_60arcsec",
+      "uncomp_mean_rms_um": 1.211,
+      "comp_delta_bfl_mm": 0.001,
+      "mean_rms_um": 1.205,
+      "max_rms_um": 1.438,
+      "rms_by_field_um": {
+        "center": 1.015,
+        "mid_0.42": 1.438,
+        "edge_+Y": 1.284,
+        "edge_-Y": 1.127,
+        "edge_+X": 1.16
+      },
+      "strehl_550_center": 0.996,
+      "strehl_550_edge": 0.9756,
+      "delta_max_rms_um": 0.359
+    },
+    {
+      "perturbation": "Corrector_decenter_0.10mm",
+      "uncomp_mean_rms_um": 1.043,
+      "comp_delta_bfl_mm": 0.0008,
+      "mean_rms_um": 1.04,
+      "max_rms_um": 1.081,
+      "rms_by_field_um": {
+        "center": 0.933,
+        "mid_0.42": 1.031,
+        "edge_+Y": 1.077,
+        "edge_-Y": 1.081,
+        "edge_+X": 1.079
+      },
+      "strehl_550_center": 0.9967,
+      "strehl_550_edge": 0.9821,
+      "delta_max_rms_um": 0.002
+    },
+    {
+      "perturbation": "L1_c1_+0.1pct",
+      "uncomp_mean_rms_um": 1.066,
+      "comp_delta_bfl_mm": -0.0019,
+      "mean_rms_um": 1.043,
+      "max_rms_um": 1.079,
+      "rms_by_field_um": {
+        "center": 0.934,
+        "mid_0.42": 1.044,
+        "edge_+Y": 1.079,
+        "edge_-Y": 1.079,
+        "edge_+X": 1.079
+      },
+      "strehl_550_center": 0.9967,
+      "strehl_550_edge": 0.9819,
+      "delta_max_rms_um": 0.0
+    }
+  ],
+  "oat_m1_r1_with_m2_shim": {
+    "comp_delta_bfl_mm": -0.0026,
+    "mean_rms_um": 1.086,
+    "max_rms_um": 1.221,
+    "rms_by_field_um": {
+      "center": 0.705,
+      "mid_0.42": 1.059,
+      "edge_+Y": 1.221,
+      "edge_-Y": 1.221,
+      "edge_+X": 1.221
+    },
+    "strehl_550_center": 0.9985,
+    "strehl_550_edge": 0.9855,
+    "comp_m2_shim_mm": -0.6591
+  },
+  "monte_carlo_bfl_12mm": {
+    "n_trials": 40,
+    "max_rms_um_p50": 3.781,
+    "max_rms_um_p80": 4.693,
+    "max_rms_um_p95": 5.289,
+    "mean_rms_um_p50": 3.102,
+    "mean_rms_um_p80": 3.894,
+    "strehl_center_p50": 0.9472,
+    "strehl_center_p20": 0.9053,
+    "strehl_edge_p50": 0.813,
+    "strehl_edge_p20": 0.6972,
+    "yield_max_rms_le_7_5um_pct": 100.0,
+    "yield_max_rms_le_10_0um_pct": 100.0,
+    "yield_max_rms_le_15_0um_pct": 100.0
+  },
+  "monte_carlo_m2_shim_plus_bfl_3mm": {
+    "n_trials": 40,
+    "max_rms_um_p50": 2.07,
+    "max_rms_um_p80": 2.528,
+    "max_rms_um_p95": 3.086,
+    "mean_rms_um_p50": 1.828,
+    "mean_rms_um_p80": 2.373,
+    "strehl_center_p50": 0.9645,
+    "strehl_center_p20": 0.9231,
+    "strehl_edge_p50": 0.915,
+    "strehl_edge_p20": 0.8428,
+    "yield_max_rms_le_7_5um_pct": 100.0,
+    "yield_max_rms_le_10_0um_pct": 100.0,
+    "yield_max_rms_le_15_0um_pct": 100.0
+  },
+  "elapsed_s": 138.62
+}

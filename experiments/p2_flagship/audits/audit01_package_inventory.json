@@ -1,0 +1,994 @@
+{
+  "versions": {
+    "optiland": "0.6.3",
+    "numpy": "2.5.5",
+    "scipy": "1.18.1",
+    "astropy": "8.0.2",
+    "sep": "1.4.1",
+    "photutils": "3.1.1"
+  },
+  "optiland_dir": "/tmp/p2_venv/lib/python3.12/site-packages/optiland",
+  "modules_by_subdir": {
+    ".": [
+      "__init__.py",
+      "_deprecation.py",
+      "_suggest.py",
+      "_types.py",
+      "coatings.py",
+      "coordinate_system.py",
+      "distribution.py",
+      "jones.py",
+      "paraxial.py",
+      "paraxial_path.py",
+      "pickup.py",
+      "plugins.py",
+      "scatter.py",
+      "utils.py",
+      "wavelength.py"
+    ],
+    "aberrations": [
+      "__init__.py",
+      "chromatic.py",
+      "seidel.py",
+      "third_order.py"
+    ],
+    "analysis": [
+      "__init__.py",
+      "angle_vs_height.py",
+      "base.py",
+      "distortion.py",
+      "encircled_energy.py",
+      "field_curvature.py",
+      "grid_distortion.py",
+      "intensity.py",
+      "irradiance.py",
+      "jones_pupil.py",
+      "mtf_vs_field.py",
+      "pupil_aberration.py",
+      "ray_fan.py",
+      "rms_vs_field.py",
+      "through_focus.py",
+      "through_focus_mtf.py",
+      "through_focus_spot_diagram.py",
+      "y_ybar.py"
+    ],
+    "analysis/distortion_strategies": [
+      "__init__.py",
+      "model.py",
+      "reference_point.py"
+    ],
+    "analysis/image_simulation": [
+      "__init__.py",
+      "distortion_warper.py",
+      "engine.py",
+      "psf_basis_generator.py",
+      "simulator.py"
+    ],
+    "analysis/spot_diagram": [
+      "__init__.py",
+      "core.py",
+      "plotting.py",
+      "reference.py"
+    ],
+    "aperture": [
+      "__init__.py",
+      "base.py",
+      "epd.py",
+      "float_by_stop.py",
+      "image_fno.py",
+      "object_na.py"
+    ],
+    "apodization": [
+      "__init__.py",
+      "base.py",
+      "cosine_squared.py",
+      "gaussian.py",
+      "hann.py",
+      "polynomial.py",
+      "super_gaussian.py",
+      "tukey.py",
+      "uniform.py"
+    ],
+    "backend": [
+      "__init__.py",
+      "_conic.py",
+      "base.py",
+      "utils.py"
+    ],
+    "backend/numpy_backend": [
+      "__init__.py",
+      "conic.py",
+      "creation.py",
+      "indexing.py",
+      "interpolation.py",
+      "linalg.py",
+      "math.py",
+      "misc.py",
+      "random.py"
+    ],
+    "backend/torch_backend": [
+      "__init__.py",
+      "capabilities.py",
+      "config.py",
+      "conic.py",
+      "creation.py",
+      "indexing.py",
+      "interpolation.py",
+      "linalg.py",
+      "misc.py",
+      "passthrough.py",
+      "random.py",
+      "reductions.py"
+    ],
+    "colorimetry": [
+      "constants.py",
+      "core.py",
+      "plotting.py"
+    ],
+    "database": [
+      "__init__.py",
+      "generate_csv_database.py"
+    ],
+    "diagnostics": [
+      "__init__.py",
+      "checks.py",
+      "report.py",
+      "suggest.py"
+    ],
+    "environment": [
+      "__init__.py",
+      "air_index.py",
+      "conditions.py"
+    ],
+    "environment/models": [
+      "__init__.py",
+      "birch_downs.py",
+      "ciddor.py",
+      "edlen.py",
+      "kohlrausch.py"
+    ],
+    "fields": [
+      "__init__.py",
+      "field.py",
+      "field_group.py"
+    ],
+    "fields/field_types": [
+      "__init__.py",
+      "angle.py",
+      "base.py",
+      "object_height.py",
+      "paraxial_image_height.py",
+      "real_image_height.py"
+    ],
+    "fileio": [
+      "__init__.py",
+      "base.py",
+      "common.py",
+      "optiland_handler.py"
+    ],
+    "fileio/codev": [
+      "__init__.py",
+      "model.py",
+      "surfaces.py"
+    ],
+    "fileio/codev/reader": [
+      "__init__.py",
+      "converter.py",
+      "parser.py"
+    ],
+    "fileio/codev/writer": [
+      "__init__.py",
+      "encoder.py",
+      "exporter.py",
+      "formatter.py"
+    ],
+    "fileio/oslo": [
+      "__init__.py",
+      "constants.py",
+      "model.py",
+      "surfaces.py",
+      "syntax.py",
+      "validation.py"
+    ],
+    "fileio/oslo/reader": [
+      "configurations.py",
+      "converter.py",
+      "coordinates.py",
+      "geometry.py",
+      "parser.py",
+      "pickups.py",
+      "solves.py"
+    ],
+    "fileio/oslo/writer": [
+      "encoder.py",
+      "exporter.py",
+      "formatter.py"
+    ],
+    "fileio/zemax": [
+      "__init__.py",
+      "model.py",
+      "surfaces.py"
+    ],
+    "fileio/zemax/reader": [
+      "__init__.py",
+      "converter.py",
+      "parser.py",
+      "source.py"
+    ],
+    "fileio/zemax/writer": [
+      "__init__.py",
+      "encoder.py",
+      "exporter.py",
+      "formatter.py"
+    ],
+    "geometries": [
+      "__init__.py",
+      "base.py",
+      "biconic.py",
+      "chebyshev.py",
+      "even_asphere.py",
+      "grid_sag.py",
+      "newton_raphson.py",
+      "odd_asphere.py",
+      "plane.py",
+      "plane_grating.py",
+      "polynomial.py",
+      "standard.py",
+      "standard_grating.py",
+      "toroidal.py",
+      "zernike.py"
+    ],
+    "geometries/forbes": [
+      "__init__.py",
+      "geometry.py",
+      "jacobi.py",
+      "qpoly.py"
+    ],
+    "geometries/nurbs": [
+      "__init__.py",
+      "nurbs_basis_functions.py",
+      "nurbs_fitting.py",
+      "nurbs_geometry.py"
+    ],
+    "interactions": [
+      "__init__.py",
+      "base.py",
+      "diffractive_model.py",
+      "phase_interaction_model.py",
+      "refractive_reflective_model.py",
+      "thin_lens_interaction_model.py"
+    ],
+    "materials": [
+      "__init__.py",
+      "_catalog_parsing.py",
+      "_material_matching.py",
+      "abbe.py",
+      "base.py",
+      "buchdahl.py",
+      "catalog.py",
+      "data.py",
+      "definition.py",
+      "dispersion.py",
+      "ideal.py",
+      "material.py",
+      "material_file.py",
+      "material_spec.py",
+      "material_utils.py",
+      "registry.py",
+      "rii.py",
+      "spectral.py",
+      "warnings.py"
+    ],
+    "ml": [
+      "__init__.py",
+      "wrappers.py"
+    ],
+    "mtf": [
+      "__init__.py",
+      "base.py",
+      "fft.py",
+      "geometric.py",
+      "huygens_fresnel.py",
+      "sampled.py",
+      "vectorial_fft.py"
+    ],
+    "multiconfig": [
+      "__init__.py",
+      "multi_configuration.py"
+    ],
+    "nonsequential": [
+      "__init__.py",
+      "_utils.py",
+      "convert.py",
+      "diagnostics.py",
+      "path_recording.py",
+      "ray_bundle.py",
+      "rng.py",
+      "sampling.py",
+      "scene.py",
+      "serialization.py",
+      "tracer.py",
+      "units.py"
+    ],
+    "nonsequential/backends": [
+      "__init__.py",
+      "array_backend.py",
+      "base.py",
+      "numpy_backend.py",
+      "torch_backend.py"
+    ],
+    "nonsequential/bsdf": [
+      "__init__.py",
+      "base.py",
+      "harvey_shack.py",
+      "lambertian.py",
+      "specular.py",
+      "tabulated.py"
+    ],
+    "nonsequential/components": [
+      "__init__.py",
+      "absorbing.py",
+      "base.py",
+      "coating_support.py",
+      "compound.py",
+      "configs.py",
+      "doublet.py",
+      "lens.py",
+      "mirror.py",
+      "reflective.py",
+      "refractive.py",
+      "registry.py",
+      "volume.py"
+    ],
+    "nonsequential/components/geometry": [
+      "__init__.py",
+      "base.py"
+    ],
+    "nonsequential/components/geometry/analytic": [
+      "__init__.py",
+      "annulus.py",
+      "conic.py",
+      "frustum.py",
+      "plane.py",
+      "sphere.py"
+    ],
+    "nonsequential/components/geometry/mesh": [
+      "__init__.py",
+      "mesh_geometry.py"
+    ],
+    "nonsequential/detectors": [
+      "__init__.py",
+      "base.py",
+      "configs.py",
+      "dispatch.py",
+      "far_field.py",
+      "irradiance.py",
+      "ray_database.py",
+      "registry.py",
+      "spectral.py"
+    ],
+    "nonsequential/ir": [
+      "__init__.py",
+      "bsdf_ir.py",
+      "interpreter.py",
+      "lower.py",
+      "medium_ir.py",
+      "scene_ir.py"
+    ],
+    "nonsequential/materials": [
+      "__init__.py",
+      "nsq_material.py"
+    ],
+    "nonsequential/results": [
+      "__init__.py",
+      "far_field_pattern.py",
+      "irradiance_map.py",
+      "ray_database.py",
+      "spectral_result.py"
+    ],
+    "nonsequential/sources": [
+      "__init__.py",
+      "base.py",
+      "collimated.py",
+      "configs.py",
+      "extended.py",
+      "point.py",
+      "registry.py"
+    ],
+    "nonsequential/visualization": [
+      "__init__.py",
+      "rays.py",
+      "viewer_2d.py",
+      "viewer_3d.py"
+    ],
+    "nonsequential/visualization/renderers": [
+      "__init__.py",
+      "base.py",
+      "detector.py",
+      "lens.py",
+      "mirror.py"
+    ],
+    "optic": [
+      "__init__.py",
+      "context.py",
+      "extended_source_optic.py",
+      "optic.py",
+      "optic_serializer.py",
+      "optic_updater.py"
+    ],
+    "optimization": [
+      "__init__.py",
+      "batched_evaluator.py",
+      "problem.py"
+    ],
+    "optimization/operand": [
+      "__init__.py",
+      "aberration.py",
+      "lens.py",
+      "operand.py",
+      "operand_manager.py",
+      "paraxial.py",
+      "ray.py"
+    ],
+    "optimization/optimizer": [
+      "base.py",
+      "live_plotter.py"
+    ],
+    "optimization/optimizer/custom": [
+      "__init__.py",
+      "cma_es.py",
+      "particle_swarm.py"
+    ],
+    "optimization/optimizer/scipy": [
+      "__init__.py",
+      "base.py",
+      "basin_hopping.py",
+      "differential_evolution.py",
+      "dual_annealing.py",
+      "glass_expert.py",
+      "least_squares.py",
+      "orthogonal_descent.py",
+      "shgo.py"
+    ],
+    "optimization/optimizer/torch": [
+      "__init__.py",
+      "adam.py",
+      "base.py",
+      "sgd.py"
+    ],
+    "optimization/scaling": [
+      "__init__.py",
+      "base.py",
+      "identity.py",
+      "linear.py",
+      "log.py",
+      "power.py",
+      "reciprocal.py"
+    ],
+    "optimization/variable": [
+      "__init__.py",
+      "asphere_coeff.py",
+      "base.py",
+      "chebyshev_coeff.py",
+      "conic.py",
+      "decenter.py",
+      "forbes_coeff.py",
+      "grid_sag.py",
+      "index.py",
+      "material.py",
+      "norm_radius.py",
+      "nurbs.py",
+      "polynomial_coeff.py",
+      "radius.py",
+      "reciprocal_radius.py",
+      "thickness.py",
+      "tilt.py",
+      "torch.py",
+      "variable.py",
+      "variable_manager.py",
+      "zernike_coeff.py"
+    ],
+    "phase": [
+      "__init__.py",
+      "base.py",
+      "constant.py",
+      "grid.py",
+      "height_profile.py",
+      "interpolators.py",
+      "linear_grating.py",
+      "radial.py"
+    ],
+    "physical_apertures": [
+      "__init__.py",
+      "base.py",
+      "elliptical.py",
+      "offset_radial.py",
+      "polygon.py",
+      "radial.py",
+      "rectangular.py"
+    ],
+    "physical_optics": [
+      "__init__.py",
+      "diagnostics.py",
+      "field.py",
+      "propagation.py"
+    ],
+    "prescription": [
+      "__init__.py",
+      "_formatting.py",
+      "document.py",
+      "prescription.py"
+    ],
+    "prescription/renderers": [
+      "__init__.py",
+      "base.py",
+      "console.py",
+      "pdf.py",
+      "plain_text.py"
+    ],
+    "prescription/sections": [
+      "__init__.py",
+      "base.py",
+      "first_order.py",
+      "seidel.py",
+      "surface_table.py",
+      "system_overview.py"
+    ],
+    "propagation": [
+      "__init__.py",
+      "base.py",
+      "grin.py",
+      "homogeneous.py"
+    ],
+    "psf": [
+      "__init__.py",
+      "base.py",
+      "fft.py",
+      "huygens_fresnel.py",
+      "huygens_fresnel_strategies.py",
+      "mmdft.py",
+      "vectorial_fft.py",
+      "vectorial_huygens.py"
+    ],
+    "rays": [
+      "__init__.py",
+      "base.py",
+      "paraxial_rays.py",
+      "polarization_state.py",
+      "polarized_rays.py",
+      "ray_generator.py",
+      "real_rays.py"
+    ],
+    "rays/ray_aiming": [
+      "__init__.py",
+      "base.py",
+      "cached.py",
+      "initialization.py",
+      "iterative.py",
+      "parameterization.py",
+      "paraxial.py",
+      "pupil_map.py",
+      "registry.py",
+      "robust.py"
+    ],
+    "raytrace": [
+      "__init__.py",
+      "base.py",
+      "paraxial_ray_tracer.py",
+      "real_ray_tracer.py"
+    ],
+    "samples": [
+      "__init__.py",
+      "eyepieces.py",
+      "infrared.py",
+      "lithography.py",
+      "microscopes.py",
+      "miscellaneous.py",
+      "objectives.py",
+      "simple.py",
+      "telescopes.py"
+    ],
+    "sequences": [
+      "__init__.py",
+      "resolver.py",
+      "sequenced_optic.py",
+      "sequenced_surface_group.py",
+      "steps.py",
+      "surface_view.py"
+    ],
+    "solves": [
+      "__init__.py",
+      "base.py",
+      "chief_ray_height.py",
+      "curvature.py",
+      "factory.py",
+      "marginal_ray_height.py",
+      "quick_focus.py",
+      "ray_height_base.py",
+      "solve_manager.py",
+      "thickness.py"
+    ],
+    "sources": [
+      "__init__.py",
+      "base.py",
+      "smf.py",
+      "visualization.py"
+    ],
+    "surfaces": [
+      "__init__.py",
+      "converters.py",
+      "image_surface.py",
+      "object_surface.py",
+      "observer.py",
+      "standard_surface.py",
+      "surface_group.py"
+    ],
+    "surfaces/factories": [
+      "__init__.py",
+      "coating_factory.py",
+      "coordinate_system_factory.py",
+      "geometry_configs.py",
+      "geometry_factory.py",
+      "interaction_model_factory.py",
+      "material_factory.py",
+      "surface_factory.py"
+    ],
+    "thin_film": [
+      "__init__.py",
+      "analysis.py",
+      "core.py",
+      "layer.py",
+      "stack.py"
+    ],
+    "thin_film/optimization": [
+      "__init__.py",
+      "needle.py",
+      "optimizer.py",
+      "report.py"
+    ],
+    "thin_film/optimization/operand": [
+      "__init__.py",
+      "core.py",
+      "plotter.py",
+      "thin_film.py"
+    ],
+    "thin_film/optimization/variable": [
+      "__init__.py",
+      "layer_thickness.py"
+    ],
+    "thin_film/tolerancing": [
+      "__init__.py",
+      "core.py",
+      "monte_carlo.py",
+      "perturbation.py",
+      "sensitivity_analysis.py"
+    ],
+    "tolerancing": [
+      "__init__.py",
+      "compensator.py",
+      "core.py",
+      "monte_carlo.py",
+      "perturbation.py",
+      "sensitivity_analysis.py"
+    ],
+    "visualization": [
+      "__init__.py",
+      "base.py",
+      "component_renderer.py",
+      "palettes.py",
+      "themes.py"
+    ],
+    "visualization/analysis": [
+      "__init__.py",
+      "surface_sag.py"
+    ],
+    "visualization/info": [
+      "__init__.py",
+      "lens_info_viewer.py",
+      "material_formatter.py",
+      "providers.py"
+    ],
+    "visualization/system": [
+      "__init__.py",
+      "interaction.py",
+      "lens.py",
+      "mirror.py",
+      "optic_viewer.py",
+      "optic_viewer_3d.py",
+      "ray_bundle.py",
+      "ray_path.py",
+      "rays.py",
+      "surface.py",
+      "system.py",
+      "utils.py"
+    ],
+    "wavefront": [
+      "__init__.py",
+      "opd.py",
+      "opd_fan.py",
+      "reference_geometry.py",
+      "strategy.py",
+      "wavefront.py",
+      "wavefront_data.py",
+      "zernike_opd.py"
+    ],
+    "zernike": [
+      "__init__.py",
+      "base.py",
+      "fit.py",
+      "fringe.py",
+      "noll.py",
+      "standard.py"
+    ]
+  },
+  "analysis_files": [
+    "__init__.py",
+    "angle_vs_height.py",
+    "base.py",
+    "distortion.py",
+    "distortion_strategies",
+    "encircled_energy.py",
+    "field_curvature.py",
+    "grid_distortion.py",
+    "image_simulation",
+    "intensity.py",
+    "irradiance.py",
+    "jones_pupil.py",
+    "mtf_vs_field.py",
+    "pupil_aberration.py",
+    "ray_fan.py",
+    "rms_vs_field.py",
+    "spot_diagram",
+    "through_focus.py",
+    "through_focus_mtf.py",
+    "through_focus_spot_diagram.py",
+    "y_ybar.py"
+  ],
+  "image_simulation_import_check": {
+    "optiland.analysis.image_simulation": {
+      "imported": true,
+      "matching_attrs": [
+        "DistortionWarper",
+        "ImageSimulationEngine",
+        "PSFBasisGenerator",
+        "SpatiallyVariableSimulator",
+        "distortion_warper",
+        "psf_basis_generator",
+        "simulator"
+      ]
+    },
+    "optiland.image_simulation": {
+      "imported": false,
+      "error": "ModuleNotFoundError: No module named 'optiland.image_simulation'"
+    },
+    "optiland.simulation": {
+      "imported": false,
+      "error": "ModuleNotFoundError: No module named 'optiland.simulation'"
+    },
+    "optiland.analysis": {
+      "imported": true,
+      "matching_attrs": [
+        "image_simulation"
+      ]
+    }
+  },
+  "keyword_hits": {
+    "ImageSimulation": [
+      "analysis/image_simulation/__init__.py",
+      "analysis/image_simulation/engine.py"
+    ],
+    "image_simulation": [],
+    "DistortionWarper": [
+      "analysis/image_simulation/__init__.py",
+      "analysis/image_simulation/distortion_warper.py",
+      "analysis/image_simulation/engine.py"
+    ],
+    "EigenPSF": [
+      "analysis/image_simulation/engine.py",
+      "analysis/image_simulation/psf_basis_generator.py",
+      "analysis/image_simulation/simulator.py"
+    ],
+    "TMA": [
+      "paraxial_path.py",
+      "scatter.py",
+      "backend/base.py",
+      "backend/numpy_backend/conic.py",
+      "backend/numpy_backend/misc.py",
+      "backend/torch_backend/capabilities.py",
+      "backend/torch_backend/config.py",
+      "backend/torch_backend/misc.py",
+      "nonsequential/visualization/rays.py",
+      "nonsequential/visualization/renderers/detector.py",
+      "prescription/renderers/pdf.py",
+      "psf/huygens_fresnel_strategies.py",
+      "rays/ray_aiming/robust.py",
+      "thin_film/tolerancing/monte_carlo.py",
+      "tolerancing/monte_carlo.py",
+      "visualization/themes.py",
+      "visualization/system/lens.py",
+      "visualization/system/mirror.py",
+      "visualization/system/rays.py",
+      "visualization/system/surface.py",
+      "visualization/system/utils.py"
+    ],
+    "ThreeMirror": [],
+    "Ritchey": [],
+    "Grating": [
+      "_types.py",
+      "fileio/oslo/reader/converter.py",
+      "geometries/__init__.py",
+      "geometries/plane_grating.py",
+      "geometries/standard_grating.py",
+      "interactions/diffractive_model.py",
+      "ml/wrappers.py",
+      "nonsequential/convert.py",
+      "phase/__init__.py",
+      "phase/linear_grating.py",
+      "psf/huygens_fresnel.py",
+      "psf/vectorial_huygens.py",
+      "rays/real_rays.py",
+      "surfaces/factories/geometry_configs.py",
+      "surfaces/factories/geometry_factory.py",
+      "surfaces/factories/surface_factory.py"
+    ],
+    "Spectrometer": [],
+    "FieldCorrector": [
+      "samples/__init__.py",
+      "samples/objectives.py"
+    ]
+  },
+  "samples": {
+    "eyepieces.py": [
+      {
+        "name": "EyepieceErfle",
+        "doc": "An Erfle eyepiece design."
+      }
+    ],
+    "infrared.py": [
+      {
+        "name": "InfraredTriplet",
+        "doc": "An infrared air-spaced triplet lens."
+      },
+      {
+        "name": "InfraredTripletF4",
+        "doc": "A 4-inch infrared triplet lens with f/4."
+      }
+    ],
+    "lithography.py": [
+      {
+        "name": "UVProjectionLens",
+        "doc": "A UV projection lens for 248 nm lithography."
+      }
+    ],
+    "microscopes.py": [
+      {
+        "name": "Objective60x",
+        "doc": "A 60x microscope objective lens."
+      },
+      {
+        "name": "Microscope20x",
+        "doc": "20x Microscope Objective"
+      },
+      {
+        "name": "UVReflectingMicroscope",
+        "doc": "53x UV Reflecting Objective"
+      }
+    ],
+    "miscellaneous.py": [
+      {
+        "name": "NavarroWideAngleEye",
+        "doc": "Navarro wide-angle schematic eye for 543 nm light."
+      }
+    ],
+    "objectives.py": [
+      {
+        "name": "TripletTelescopeObjective",
+        "doc": "A triplet telescope objective lens design."
+      },
+      {
+        "name": "CookeTriplet",
+        "doc": "A Cooke triplet lens design."
+      },
+      {
+        "name": "DoubleGauss",
+        "doc": "A Double Gauss lens design."
+      },
+      {
+        "name": "ReverseTelephoto",
+        "doc": "A reverse telephoto lens design."
+      },
+      {
+        "name": "ObjectiveUS008879901",
+        "doc": "An objective lens design based on U.S. Patent 8,879,901."
+      },
+      {
+        "name": "TelescopeObjective48Inch",
+        "doc": "48-in. Telescope Objective"
+      },
+      {
+        "name": "HeliarLens",
+        "doc": "Heliar Lens f/5"
+      },
+      {
+        "name": "TessarLens",
+        "doc": "Tessar Lens f/4.5"
+      },
+      {
+        "name": "LensWithFieldCorrector",
+        "doc": "5-in. Focal Length, f/3.5 Lens with Field Corrector."
+      },
+      {
+        "name": "PetzvalLens",
+        "doc": "Petzval lens f/1.4."
+      },
+      {
+        "name": "Telephoto",
+        "doc": "Telephoto lens f/5.6."
+      },
+      {
+        "name": "WideAngle100FOV",
+        "doc": "A wide-angle lens design with a 100° field of view."
+      },
+      {
+        "name": "ProjectionLens120FOV",
+        "doc": "A 120-degree FOV projection lens design."
+      },
+      {
+        "name": "ProjectionLens160FOV",
+        "doc": "An f/2 160-degree FOV projection lens."
+      },
+      {
+        "name": "WideAngle170FOV",
+        "doc": "A 170-degree FOV, f/1.8 camera lens."
+      }
+    ],
+    "simple.py": [
+      {
+        "name": "Edmund_49_847",
+        "doc": "Edmund Optics 49-847."
+      },
+      {
+        "name": "SingletStopSurf2",
+        "doc": "A simple singlet lens with the stop on surface 2."
+      },
+      {
+        "name": "TelescopeDoublet",
+        "doc": "A telescope doublet lens."
+      },
+      {
+        "name": "CementedAchromat",
+        "doc": "A cemented achromatic doublet lens."
+      },
+      {
+        "name": "AsphericSinglet",
+        "doc": "An aspheric singlet lens."
+      }
+    ],
+    "telescopes.py": [
+      {
+        "name": "HubbleTelescope",
+        "doc": "Hubble Space Telescope optical design."
+      }
+    ]
+  },
+  "wavefront_strategy_classes": [
+    "ReferenceStrategy",
+    "ChiefRayStrategy",
+    "CentroidStrategy",
+    "BestFitStrategy"
+  ],
+  "tolerancing_perturbation_classes": [
+    "ABC",
+    "BaseSampler",
+    "DistributionSampler",
+    "IdentityScaler",
+    "Perturbation",
+    "RangeSampler",
+    "ScalarSampler",
+    "Variable",
+    "abstractmethod",
+    "annotations",
+    "be"
+  ],
+  "elapsed_sec": 0.362
+}

@@ -1,0 +1,137 @@
+{
+  "branch_key": "S1",
+  "branch_id": "S1_2Lens_FS_RC",
+  "materials": [
+    "Fused Silica",
+    "Fused Silica"
+  ],
+  "unlock_conics": false,
+  "k1": -1.1283884,
+  "k2": -6.2203654,
+  "d_m1_l1_mm": 251.905,
+  "bfl_mm": 57.789,
+  "total_behind_m1_mm": 453.909,
+  "lenses": [
+    {
+      "lens": 1,
+      "material": "Fused Silica",
+      "r1_mm": -1744.459,
+      "r2_mm": -643.33,
+      "tc_mm": 20.0,
+      "gap_after_mm": 108.215,
+      "clear_semi_ap_mm": 79.45,
+      "edge_thickness_mm": 16.89
+    },
+    {
+      "lens": 2,
+      "material": "Fused Silica",
+      "r1_mm": -244.094,
+      "r2_mm": -573.743,
+      "tc_mm": 16.0,
+      "gap_after_mm": 57.789,
+      "clear_semi_ap_mm": 69.74,
+      "edge_thickness_mm": 21.92
+    }
+  ],
+  "best_u": [
+    -0.573244,
+    -1.554411,
+    -4.09679,
+    -1.742941,
+    2.519054,
+    1.082146,
+    0.57789
+  ],
+  "seed_runs": [
+    {
+      "seed": 0,
+      "cost": 161.223,
+      "nfev": 672,
+      "dt_s": 133.34,
+      "status": 2
+    },
+    {
+      "seed": 1,
+      "cost": 161.218,
+      "nfev": 266,
+      "dt_s": 51.73,
+      "status": 2
+    }
+  ],
+  "elapsed_total_s": 190.87,
+  "metrics": {
+    "valid": true,
+    "efl_mm": 6012.697,
+    "fno": 6.0127,
+    "rms_um_poly_by_field": {
+      "0.0": 3.433,
+      "0.25": 2.979,
+      "0.42": 4.713,
+      "0.6": 3.853
+    },
+    "rms_um_550nm_by_field": {
+      "0.0": 3.211,
+      "0.25": 2.203,
+      "0.42": 4.11,
+      "0.6": 3.575
+    },
+    "max_rms_poly_um": 4.713,
+    "mean_rms_poly_um": 3.745,
+    "rms_arcsec_poly_by_field": {
+      "0.0": 0.1178,
+      "0.25": 0.1022,
+      "0.42": 0.1617,
+      "0.6": 0.1322
+    },
+    "chief_y_550nm_mm": {
+      "0.0": 0.0,
+      "0.25": 26.27163,
+      "0.42": 44.26006,
+      "0.6": 63.52382
+    },
+    "clipped_rays": 2096,
+    "total_rays": 13072,
+    "lens_clear_semi_apertures_mm": {
+      "4": 74.45,
+      "5": 73.98,
+      "6": 64.28,
+      "7": 64.74
+    },
+    "fft_strehl_550nm": {
+      "0.0": 0.69874,
+      "0.25": 0.7136,
+      "0.42": 0.45377,
+      "0.6": 0.70863
+    },
+    "huygens_strehl_550nm": {
+      "0.0": 0.42164,
+      "0.42": 0.31139,
+      "0.6": 0.49833
+    },
+    "mtf_33lp_mm_550nm": {
+      "0.0": {
+        "tangential": 0.6903,
+        "sagittal": 0.6903
+      },
+      "0.25": {
+        "tangential": 0.7654,
+        "sagittal": 0.7425
+      },
+      "0.42": {
+        "tangential": 0.5907,
+        "sagittal": 0.7728
+      },
+      "0.6": {
+        "tangential": 0.6707,
+        "sagittal": 0.7531
+      }
+    },
+    "distortion_pct_by_field": {
+      "0.0": 0.0,
+      "0.25": 0.15026,
+      "0.42": 0.42984,
+      "0.6": 0.89679
+    },
+    "distortion_pct_max_abs": 0.89679
+  }
+}

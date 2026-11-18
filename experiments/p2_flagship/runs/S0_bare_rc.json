@@ -1,0 +1,84 @@
+{
+  "system_id": "S0_bare_rc",
+  "description": "Analytical 1.0m f/6.0 Ritchey-Chretien baseline (no refractive corrector)",
+  "prescription": {
+    "D_mm": 1000.0,
+    "EFL_target_mm": 6000.0,
+    "F1": 2.2,
+    "f1_mm": 2200.0,
+    "R1_mm": -4400.0,
+    "K1": -1.12838839,
+    "d_M1_M2_mm": 1489.02439,
+    "R2_mm": -2245.186136,
+    "K2": -6.22036543,
+    "sp_M2_to_focus_mm": 1939.02439,
+    "back_clearance_behind_M1_mm": 450.0,
+    "central_obscuration_r_min_mm": 182.179,
+    "linear_obscuration_ratio": 0.3644,
+    "area_obscuration_ratio": 0.1328
+  },
+  "paraxial": {
+    "efl_mm": 6000.0,
+    "fno": 6.0,
+    "plate_scale_arcsec_per_mm": 34.3775,
+    "pixel_pitch_um": 15.0,
+    "pixel_scale_arcsec_per_px": 0.5157
+  },
+  "seidel_coefficients_waves_approx": {
+    "SI_spherical": -0.0,
+    "SII_coma": -0.0,
+    "SIII_astigmatism": -0.012385,
+    "SIV_petzval": -0.011961,
+    "SV_distortion": 0.001274
+  },
+  "polychromatic_rms_spot_um_by_field_deg": {
+    "0.0": 1.213,
+    "0.25": 28.845,
+    "0.42": 83.147,
+    "0.6": 170.74
+  },
+  "polychromatic_rms_spot_arcsec_by_field_deg": {
+    "0.0": 0.0417,
+    "0.25": 0.9916,
+    "0.42": 2.8584,
+    "0.6": 5.8696
+  },
+  "psf_strehl_550nm_cross_check": {
+    "0.0": {
+      "fft_strehl": 0.98774,
+      "huygens_strehl": 0.60335
+    },
+    "0.42": {
+      "fft_strehl": 0.00337,
+      "huygens_strehl": 0.00724
+    },
+    "0.6": {
+      "fft_strehl": 0.0029,
+      "huygens_strehl": 0.00731
+    }
+  },
+  "mtf_at_33lp_mm_550nm": {
+    "0.0": {
+      "freq_lp_mm": 33.33,
+      "tangential": 0.7791,
+      "sagittal": 0.7791
+    },
+    "0.25": {
+      "freq_lp_mm": 33.33,
+      "tangential": 0.0909,
+      "sagittal": 0.1824
+    },
+    "0.42": {
+      "freq_lp_mm": 33.33,
+      "tangential": 0.0044,
+      "sagittal": 0.0122
+    },
+    "0.6": {
+      "freq_lp_mm": 33.33,
+      "tangential": 0.0061,
+      "sagittal": 0.0022
+    }
+  },
+  "distortion_pct_max_abs": 0.01217,
+  "elapsed_s": 4.74
+}

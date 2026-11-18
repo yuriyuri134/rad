@@ -1,0 +1,43 @@
+{
+  "grating_spectrograph": {
+    "ok": true,
+    "elapsed_s": 2.3954,
+    "period_um": 1.6666666666666667,
+    "order": 1,
+    "image_y_mm_by_wl_um": {
+      "0.45": 159.40038,
+      "0.55": 172.22721,
+      "0.65": -466.21551
+    },
+    "post_grating_M_angle_deg": {
+      "0.45": -46.9257,
+      "0.55": -51.0732,
+      "0.65": -55.4526
+    }
+  },
+  "astropy_fits_photometry": {
+    "ok": true,
+    "elapsed_s": 0.1874,
+    "fits_path": "experiments/p2_flagship/audits/audit04_test_starfield.fits",
+    "dao_detected_count": 4,
+    "sep_detected_count": 4,
+    "dao_centroid_errors_px": [
+      0.0517,
+      0.0278,
+      0.0136,
+      0.0282
+    ],
+    "sep_centroid_errors_px": [
+      0.0176,
+      0.0078,
+      0.0429,
+      0.0301
+    ],
+    "wcs_ra_sample": [
+      150.013147,
+      149.999938,
+      149.98702,
+      149.984915
+    ]
+  }
+}

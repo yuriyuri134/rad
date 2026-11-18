@@ -1,0 +1,619 @@
+{
+  "systems": {
+    "S0_bare_rc": {
+      "efl_mm": 6000.0,
+      "max_distortion_offset_um": 11.59,
+      "tiles": [
+        {
+          "field_deg": 0.0,
+          "fits_path": "experiments/p2_flagship/runs/fits/S0_bare_rc_tile_0.00deg.fits",
+          "sky_rms_adu": 7.862,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 21,
+            "n_matched": 19,
+            "completeness_pct": 67.9,
+            "astrometry_raw_wcs_rms_arcsec": 0.03,
+            "astrometry_post_dist_rms_arcsec": 0.0305,
+            "median_fwhm_arcsec": 1.264,
+            "phot_flux_recovery_median": 0.9867,
+            "phot_flux_scatter_pct": 2.89
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.0242,
+            "astrometry_post_dist_rms_arcsec": 0.0237,
+            "median_fwhm_arcsec": 1.388,
+            "phot_flux_recovery_median": 0.9863,
+            "phot_flux_scatter_pct": 2.61
+          }
+        },
+        {
+          "field_deg": 0.25,
+          "fits_path": "experiments/p2_flagship/runs/fits/S0_bare_rc_tile_0.25deg.fits",
+          "sky_rms_adu": 7.838,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 25,
+            "completeness_pct": 89.3,
+            "astrometry_raw_wcs_rms_arcsec": 0.6759,
+            "astrometry_post_dist_rms_arcsec": 0.6351,
+            "median_fwhm_arcsec": 2.223,
+            "phot_flux_recovery_median": 0.9026,
+            "phot_flux_scatter_pct": 2.53
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 26,
+            "n_matched": 24,
+            "completeness_pct": 85.7,
+            "astrometry_raw_wcs_rms_arcsec": 0.2205,
+            "astrometry_post_dist_rms_arcsec": 0.2014,
+            "median_fwhm_arcsec": 2.066,
+            "phot_flux_recovery_median": 0.9551,
+            "phot_flux_scatter_pct": 3.5
+          }
+        },
+        {
+          "field_deg": 0.42,
+          "fits_path": "experiments/p2_flagship/runs/fits/S0_bare_rc_tile_0.42deg.fits",
+          "sky_rms_adu": 7.889,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 14,
+            "n_matched": 9,
+            "completeness_pct": 32.1,
+            "astrometry_raw_wcs_rms_arcsec": 3.1353,
+            "astrometry_post_dist_rms_arcsec": 3.1522,
+            "median_fwhm_arcsec": 3.235,
+            "phot_flux_recovery_median": 0.2973,
+            "phot_flux_scatter_pct": 1.25
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 25,
+            "n_matched": 14,
+            "completeness_pct": 50.0,
+            "astrometry_raw_wcs_rms_arcsec": 2.5747,
+            "astrometry_post_dist_rms_arcsec": 2.4855,
+            "median_fwhm_arcsec": 3.271,
+            "phot_flux_recovery_median": 0.3388,
+            "phot_flux_scatter_pct": 1.6
+          }
+        },
+        {
+          "field_deg": 0.6,
+          "fits_path": "experiments/p2_flagship/runs/fits/S0_bare_rc_tile_0.60deg.fits",
+          "sky_rms_adu": 8.019,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 2,
+            "n_matched": 0,
+            "completeness_pct": 0.0,
+            "astrometry_raw_wcs_rms_arcsec": null,
+            "astrometry_post_dist_rms_arcsec": null,
+            "median_fwhm_arcsec": null,
+            "phot_flux_recovery_median": null,
+            "phot_flux_scatter_pct": null
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 9,
+            "n_matched": 1,
+            "completeness_pct": 3.6,
+            "astrometry_raw_wcs_rms_arcsec": 4.2201,
+            "astrometry_post_dist_rms_arcsec": 3.9503,
+            "median_fwhm_arcsec": 3.503,
+            "phot_flux_recovery_median": 0.0721,
+            "phot_flux_scatter_pct": 0.0
+          }
+        }
+      ],
+      "elapsed_s": 2.2
+    },
+    "S1_2Lens_FS_RC": {
+      "efl_mm": 6012.697,
+      "max_distortion_offset_um": 721.22,
+      "tiles": [
+        {
+          "field_deg": 0.0,
+          "fits_path": "experiments/p2_flagship/runs/fits/S1_2Lens_FS_RC_tile_0.00deg.fits",
+          "sky_rms_adu": 7.852,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 24,
+            "n_matched": 22,
+            "completeness_pct": 78.6,
+            "astrometry_raw_wcs_rms_arcsec": 0.0319,
+            "astrometry_post_dist_rms_arcsec": 0.0328,
+            "median_fwhm_arcsec": 1.31,
+            "phot_flux_recovery_median": 0.9837,
+            "phot_flux_scatter_pct": 5.01
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.0229,
+            "astrometry_post_dist_rms_arcsec": 0.0211,
+            "median_fwhm_arcsec": 1.39,
+            "phot_flux_recovery_median": 0.9822,
+            "phot_flux_scatter_pct": 4.49
+          }
+        },
+        {
+          "field_deg": 0.25,
+          "fits_path": "experiments/p2_flagship/runs/fits/S1_2Lens_FS_RC_tile_0.25deg.fits",
+          "sky_rms_adu": 7.841,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 20,
+            "n_matched": 19,
+            "completeness_pct": 67.9,
+            "astrometry_raw_wcs_rms_arcsec": 1.1925,
+            "astrometry_post_dist_rms_arcsec": 0.0289,
+            "median_fwhm_arcsec": 1.319,
+            "phot_flux_recovery_median": 0.9842,
+            "phot_flux_scatter_pct": 3.28
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 1.2494,
+            "astrometry_post_dist_rms_arcsec": 0.0295,
+            "median_fwhm_arcsec": 1.392,
+            "phot_flux_recovery_median": 0.9831,
+            "phot_flux_scatter_pct": 3.34
+          }
+        },
+        {
+          "field_deg": 0.42,
+          "fits_path": "experiments/p2_flagship/runs/fits/S1_2Lens_FS_RC_tile_0.42deg.fits",
+          "sky_rms_adu": 7.829,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 17,
+            "n_matched": 17,
+            "completeness_pct": 60.7,
+            "astrometry_raw_wcs_rms_arcsec": 6.7826,
+            "astrometry_post_dist_rms_arcsec": 0.0353,
+            "median_fwhm_arcsec": 1.627,
+            "phot_flux_recovery_median": 0.98,
+            "phot_flux_scatter_pct": 3.57
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 6.6478,
+            "astrometry_post_dist_rms_arcsec": 0.0365,
+            "median_fwhm_arcsec": 1.379,
+            "phot_flux_recovery_median": 0.9823,
+            "phot_flux_scatter_pct": 3.4
+          }
+        },
+        {
+          "field_deg": 0.6,
+          "fits_path": "experiments/p2_flagship/runs/fits/S1_2Lens_FS_RC_tile_0.60deg.fits",
+          "sky_rms_adu": 7.833,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 20,
+            "n_matched": 18,
+            "completeness_pct": 64.3,
+            "astrometry_raw_wcs_rms_arcsec": 18.7401,
+            "astrometry_post_dist_rms_arcsec": 0.0492,
+            "median_fwhm_arcsec": 1.461,
+            "phot_flux_recovery_median": 0.9753,
+            "phot_flux_scatter_pct": 6.97
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 25,
+            "n_matched": 25,
+            "completeness_pct": 89.3,
+            "astrometry_raw_wcs_rms_arcsec": 19.2729,
+            "astrometry_post_dist_rms_arcsec": 0.0437,
+            "median_fwhm_arcsec": 1.43,
+            "phot_flux_recovery_median": 0.9781,
+            "phot_flux_scatter_pct": 6.55
+          }
+        }
+      ],
+      "elapsed_s": 2.33
+    },
+    "S2_3Lens_Wynne_FS_RC": {
+      "efl_mm": 6007.695,
+      "max_distortion_offset_um": 330.2,
+      "tiles": [
+        {
+          "field_deg": 0.0,
+          "fits_path": "experiments/p2_flagship/runs/fits/S2_3Lens_Wynne_FS_RC_tile_0.00deg.fits",
+          "sky_rms_adu": 7.839,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 20,
+            "n_matched": 19,
+            "completeness_pct": 67.9,
+            "astrometry_raw_wcs_rms_arcsec": 0.0332,
+            "astrometry_post_dist_rms_arcsec": 0.0335,
+            "median_fwhm_arcsec": 1.298,
+            "phot_flux_recovery_median": 0.986,
+            "phot_flux_scatter_pct": 5.99
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.0295,
+            "astrometry_post_dist_rms_arcsec": 0.029,
+            "median_fwhm_arcsec": 1.366,
+            "phot_flux_recovery_median": 0.9851,
+            "phot_flux_scatter_pct": 5.06
+          }
+        },
+        {
+          "field_deg": 0.25,
+          "fits_path": "experiments/p2_flagship/runs/fits/S2_3Lens_Wynne_FS_RC_tile_0.25deg.fits",
+          "sky_rms_adu": 7.841,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 17,
+            "n_matched": 12,
+            "completeness_pct": 42.9,
+            "astrometry_raw_wcs_rms_arcsec": 0.4661,
+            "astrometry_post_dist_rms_arcsec": 0.027,
+            "median_fwhm_arcsec": 1.127,
+            "phot_flux_recovery_median": 0.9783,
+            "phot_flux_scatter_pct": 2.46
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.49,
+            "astrometry_post_dist_rms_arcsec": 0.0221,
+            "median_fwhm_arcsec": 1.465,
+            "phot_flux_recovery_median": 0.9772,
+            "phot_flux_scatter_pct": 5.68
+          }
+        },
+        {
+          "field_deg": 0.42,
+          "fits_path": "experiments/p2_flagship/runs/fits/S2_3Lens_Wynne_FS_RC_tile_0.42deg.fits",
+          "sky_rms_adu": 7.831,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 18,
+            "n_matched": 17,
+            "completeness_pct": 60.7,
+            "astrometry_raw_wcs_rms_arcsec": 2.7226,
+            "astrometry_post_dist_rms_arcsec": 0.0383,
+            "median_fwhm_arcsec": 1.258,
+            "phot_flux_recovery_median": 0.9856,
+            "phot_flux_scatter_pct": 1.88
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 2.7597,
+            "astrometry_post_dist_rms_arcsec": 0.0335,
+            "median_fwhm_arcsec": 1.404,
+            "phot_flux_recovery_median": 0.9822,
+            "phot_flux_scatter_pct": 4.8
+          }
+        },
+        {
+          "field_deg": 0.6,
+          "fits_path": "experiments/p2_flagship/runs/fits/S2_3Lens_Wynne_FS_RC_tile_0.60deg.fits",
+          "sky_rms_adu": 7.828,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 16,
+            "n_matched": 14,
+            "completeness_pct": 50.0,
+            "astrometry_raw_wcs_rms_arcsec": 8.4007,
+            "astrometry_post_dist_rms_arcsec": 0.0396,
+            "median_fwhm_arcsec": 1.648,
+            "phot_flux_recovery_median": 0.9863,
+            "phot_flux_scatter_pct": 5.8
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 26,
+            "n_matched": 26,
+            "completeness_pct": 92.9,
+            "astrometry_raw_wcs_rms_arcsec": 8.6847,
+            "astrometry_post_dist_rms_arcsec": 0.0339,
+            "median_fwhm_arcsec": 1.456,
+            "phot_flux_recovery_median": 0.9786,
+            "phot_flux_scatter_pct": 4.47
+          }
+        }
+      ],
+      "elapsed_s": 2.61
+    },
+    "S3_3Lens_Wynne_FS_QuasiRC": {
+      "efl_mm": 6001.598,
+      "max_distortion_offset_um": 275.45,
+      "tiles": [
+        {
+          "field_deg": 0.0,
+          "fits_path": "experiments/p2_flagship/runs/fits/S3_3Lens_Wynne_FS_QuasiRC_tile_0.00deg.fits",
+          "sky_rms_adu": 7.862,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 21,
+            "n_matched": 19,
+            "completeness_pct": 67.9,
+            "astrometry_raw_wcs_rms_arcsec": 0.027,
+            "astrometry_post_dist_rms_arcsec": 0.0272,
+            "median_fwhm_arcsec": 1.264,
+            "phot_flux_recovery_median": 0.9869,
+            "phot_flux_scatter_pct": 3.42
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.0263,
+            "astrometry_post_dist_rms_arcsec": 0.0259,
+            "median_fwhm_arcsec": 1.39,
+            "phot_flux_recovery_median": 0.9866,
+            "phot_flux_scatter_pct": 2.98
+          }
+        },
+        {
+          "field_deg": 0.25,
+          "fits_path": "experiments/p2_flagship/runs/fits/S3_3Lens_Wynne_FS_QuasiRC_tile_0.25deg.fits",
+          "sky_rms_adu": 7.838,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 16,
+            "n_matched": 14,
+            "completeness_pct": 50.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.4419,
+            "astrometry_post_dist_rms_arcsec": 0.0383,
+            "median_fwhm_arcsec": 1.355,
+            "phot_flux_recovery_median": 0.9764,
+            "phot_flux_scatter_pct": 5.07
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.4444,
+            "astrometry_post_dist_rms_arcsec": 0.0362,
+            "median_fwhm_arcsec": 1.51,
+            "phot_flux_recovery_median": 0.9779,
+            "phot_flux_scatter_pct": 3.89
+          }
+        },
+        {
+          "field_deg": 0.42,
+          "fits_path": "experiments/p2_flagship/runs/fits/S3_3Lens_Wynne_FS_QuasiRC_tile_0.42deg.fits",
+          "sky_rms_adu": 7.833,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 14,
+            "n_matched": 14,
+            "completeness_pct": 50.0,
+            "astrometry_raw_wcs_rms_arcsec": 2.351,
+            "astrometry_post_dist_rms_arcsec": 0.0324,
+            "median_fwhm_arcsec": 1.247,
+            "phot_flux_recovery_median": 0.982,
+            "phot_flux_scatter_pct": 5.39
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 2.4126,
+            "astrometry_post_dist_rms_arcsec": 0.0362,
+            "median_fwhm_arcsec": 1.387,
+            "phot_flux_recovery_median": 0.9816,
+            "phot_flux_scatter_pct": 4.31
+          }
+        },
+        {
+          "field_deg": 0.6,
+          "fits_path": "experiments/p2_flagship/runs/fits/S3_3Lens_Wynne_FS_QuasiRC_tile_0.60deg.fits",
+          "sky_rms_adu": 7.818,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 13,
+            "n_matched": 12,
+            "completeness_pct": 42.9,
+            "astrometry_raw_wcs_rms_arcsec": 7.1223,
+            "astrometry_post_dist_rms_arcsec": 0.03,
+            "median_fwhm_arcsec": 1.578,
+            "phot_flux_recovery_median": 0.9825,
+            "phot_flux_scatter_pct": 4.79
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 27,
+            "n_matched": 27,
+            "completeness_pct": 96.4,
+            "astrometry_raw_wcs_rms_arcsec": 7.3838,
+            "astrometry_post_dist_rms_arcsec": 0.037,
+            "median_fwhm_arcsec": 1.388,
+            "phot_flux_recovery_median": 0.9818,
+            "phot_flux_scatter_pct": 3.65
+          }
+        }
+      ],
+      "elapsed_s": 2.5
+    },
+    "S4_3Lens_Wynne_FS_F2_RC": {
+      "efl_mm": 5987.006,
+      "max_distortion_offset_um": 287.36,
+      "tiles": [
+        {
+          "field_deg": 0.0,
+          "fits_path": "experiments/p2_flagship/runs/fits/S4_3Lens_Wynne_FS_F2_RC_tile_0.00deg.fits",
+          "sky_rms_adu": 7.859,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 29,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.0335,
+            "astrometry_post_dist_rms_arcsec": 0.0269,
+            "median_fwhm_arcsec": 1.541,
+            "phot_flux_recovery_median": 0.9799,
+            "phot_flux_scatter_pct": 3.18
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.0354,
+            "astrometry_post_dist_rms_arcsec": 0.0258,
+            "median_fwhm_arcsec": 1.541,
+            "phot_flux_recovery_median": 0.9805,
+            "phot_flux_scatter_pct": 3.08
+          }
+        },
+        {
+          "field_deg": 0.25,
+          "fits_path": "experiments/p2_flagship/runs/fits/S4_3Lens_Wynne_FS_F2_RC_tile_0.25deg.fits",
+          "sky_rms_adu": 7.837,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 26,
+            "n_matched": 23,
+            "completeness_pct": 82.1,
+            "astrometry_raw_wcs_rms_arcsec": 0.2361,
+            "astrometry_post_dist_rms_arcsec": 0.0277,
+            "median_fwhm_arcsec": 1.52,
+            "phot_flux_recovery_median": 0.9791,
+            "phot_flux_scatter_pct": 5.14
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 0.2342,
+            "astrometry_post_dist_rms_arcsec": 0.0237,
+            "median_fwhm_arcsec": 1.522,
+            "phot_flux_recovery_median": 0.9793,
+            "phot_flux_scatter_pct": 5.47
+          }
+        },
+        {
+          "field_deg": 0.42,
+          "fits_path": "experiments/p2_flagship/runs/fits/S4_3Lens_Wynne_FS_F2_RC_tile_0.42deg.fits",
+          "sky_rms_adu": 7.846,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 23,
+            "n_matched": 21,
+            "completeness_pct": 75.0,
+            "astrometry_raw_wcs_rms_arcsec": 2.183,
+            "astrometry_post_dist_rms_arcsec": 0.0334,
+            "median_fwhm_arcsec": 1.413,
+            "phot_flux_recovery_median": 0.9735,
+            "phot_flux_scatter_pct": 5.24
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 28,
+            "n_matched": 28,
+            "completeness_pct": 100.0,
+            "astrometry_raw_wcs_rms_arcsec": 2.2078,
+            "astrometry_post_dist_rms_arcsec": 0.0401,
+            "median_fwhm_arcsec": 1.426,
+            "phot_flux_recovery_median": 0.9764,
+            "phot_flux_scatter_pct": 4.68
+          }
+        },
+        {
+          "field_deg": 0.6,
+          "fits_path": "experiments/p2_flagship/runs/fits/S4_3Lens_Wynne_FS_F2_RC_tile_0.60deg.fits",
+          "sky_rms_adu": 7.823,
+          "photutils": {
+            "extractor": "photutils_DAOStarFinder",
+            "n_truth": 28,
+            "n_detected": 25,
+            "n_matched": 24,
+            "completeness_pct": 85.7,
+            "astrometry_raw_wcs_rms_arcsec": 7.53,
+            "astrometry_post_dist_rms_arcsec": 0.0311,
+            "median_fwhm_arcsec": 1.415,
+            "phot_flux_recovery_median": 0.9785,
+            "phot_flux_scatter_pct": 3.48
+          },
+          "sep": {
+            "extractor": "sep_extract",
+            "n_truth": 28,
+            "n_detected": 26,
+            "n_matched": 26,
+            "completeness_pct": 92.9,
+            "astrometry_raw_wcs_rms_arcsec": 7.5229,
+            "astrometry_post_dist_rms_arcsec": 0.0337,
+            "median_fwhm_arcsec": 1.486,
+            "phot_flux_recovery_median": 0.9804,
+            "phot_flux_scatter_pct": 4.69
+          }
+        }
+      ],
+      "elapsed_s": 2.35
+    }
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "branch_key": "S4",
+  "branch_id": "S4_3Lens_Wynne_FS_F2_RC",
+  "materials": [
+    "Fused Silica",
+    "F2",
+    "Fused Silica"
+  ],
+  "unlock_conics": false,
+  "k1": -1.1283884,
+  "k2": -6.2203654,
+  "d_m1_l1_mm": 87.17,
+  "bfl_mm": 55.001,
+  "total_behind_m1_mm": 452.501,
+  "lenses": [
+    {
+      "lens": 1,
+      "material": "Fused Silica",
+      "r1_mm": -1926.127,
+      "r2_mm": -993.306,
+      "tc_mm": 22.0,
+      "gap_after_mm": 243.9,
+      "clear_semi_ap_mm": 89.27,
+      "edge_thickness_mm": 20.05
+    },
+    {
+      "lens": 2,
+      "material": "F2",
+      "r1_mm": -163.002,
+      "r2_mm": -177.251,
+      "tc_mm": 14.0,
+      "gap_after_mm": 10.429,
+      "clear_semi_ap_mm": 72.1,
+      "edge_thickness_mm": 15.49
+    },
+    {
+      "lens": 3,
+      "material": "Fused Silica",
+      "r1_mm": 1803.397,
+      "r2_mm": 616.886,
+      "tc_mm": 20.0,
+      "gap_after_mm": 55.001,
+      "clear_semi_ap_mm": 70.6,
+      "edge_thickness_mm": 22.67
+    }
+  ],
+  "best_u": [
+    -0.519177,
+    -1.006739,
+    -6.134876,
+    -5.641724,
+    0.554509,
+    1.621044,
+    0.871705,
+    2.439004,
+    0.104294,
+    0.55001
+  ],
+  "seed_runs": [
+    {
+      "seed": 0,
+      "cost": 597.635,
+      "nfev": 447,
+      "dt_s": 70.9,
+      "status": 3
+    }
+  ],
+  "elapsed_total_s": 75.86,
+  "metrics": {
+    "valid": true,
+    "efl_mm": 5987.006,
+    "fno": 5.987,
+    "rms_um_poly_by_field": {
+      "0.0": 9.254,
+      "0.25": 5.659,
+      "0.42": 7.899,
+      "0.6": 9.704
+    },
+    "rms_um_550nm_by_field": {
+      "0.0": 8.754,
+      "0.25": 5.396,
+      "0.42": 8.069,
+      "0.6": 9.427
+    },
+    "max_rms_poly_um": 9.704,
+    "mean_rms_poly_um": 8.129,
+    "rms_arcsec_poly_by_field": {
+      "0.0": 0.3188,
+      "0.25": 0.195,
+      "0.42": 0.2721,
+      "0.6": 0.3343
+    },
+    "chief_y_550nm_mm": {
+      "0.0": 0.0,
+      "0.25": 26.12999,
+      "0.42": 43.94595,
+      "0.6": 62.903
+    },
+    "clipped_rays": 2096,
+    "total_rays": 13072,
+    "lens_clear_semi_apertures_mm": {
+      "4": 84.27,
+      "5": 83.73,
+      "6": 65.41,
+      "7": 67.1,
+      "8": 65.6,
+      "9": 64.43
+    },
+    "fft_strehl_550nm": {
+      "0.0": 0.07631,
+      "0.25": 0.34645,
+      "0.42": 0.24551,
+      "0.6": 0.27485
+    },
+    "huygens_strehl_550nm": {
+      "0.0": 0.03558,
+      "0.42": 0.17372,
+      "0.6": 0.20026
+    },
+    "mtf_33lp_mm_550nm": {
+      "0.0": {
+        "tangential": 0.2377,
+        "sagittal": 0.2377
+      },
+      "0.25": {
+        "tangential": 0.7034,
+        "sagittal": 0.5122
+      },
+      "0.42": {
+        "tangential": 0.3782,
+        "sagittal": 0.7105
+      },
+      "0.6": {
+        "tangential": 0.3755,
+        "sagittal": 0.5747
+      }
+    },
+    "distortion_pct_by_field": {
+      "0.0": -0.0,
+      "0.25": 0.05492,
+      "0.42": 0.16218,
+      "0.6": 0.35667
+    },
+    "distortion_pct_max_abs": 0.35667
+  }
+}

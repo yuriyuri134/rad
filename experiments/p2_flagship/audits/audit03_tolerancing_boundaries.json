@@ -1,0 +1,26 @@
+{
+  "RC_Corrector": {
+    "sensitivity": {
+      "ok": false,
+      "elapsed_s": 2.059,
+      "error": "ValueError: Only range samplers are supported."
+    },
+    "monte_carlo": {
+      "ok": false,
+      "elapsed_s": 0.049,
+      "error": "UnsupportedParaxialGeometryError: set_thickness mutates surface positions along global z only, but this system's beam path is folded off the +z axis (or entered along a different direction), so its unfolded axial coordinate is not global z. Applying the offset would move surfaces off their physical legs. A future implementation must translate downstream geometry by delta_r = parity * delta_q * leg_direction instead. No geometry was modified."
+    }
+  },
+  "OffAxis_TMA": {
+    "sensitivity": {
+      "ok": false,
+      "elapsed_s": 0.003,
+      "error": "UnsupportedParaxialGeometryError: set_thickness mutates surface positions along global z only, but this system's beam path is folded off the +z axis (or entered along a different direction), so its unfolded axial coordinate is not global z. Applying the offset would move surfaces off their physical legs. A future implementation must translate downstream geometry by delta_r = parity * delta_q * leg_direction instead. No geometry was modified."
+    },
+    "monte_carlo": {
+      "ok": false,
+      "elapsed_s": 0.003,
+      "error": "UnsupportedParaxialGeometryError: set_thickness mutates surface positions along global z only, but this system's beam path is folded off the +z axis (or entered along a different direction), so its unfolded axial coordinate is not global z. Applying the offset would move surfaces off their physical legs. A future implementation must translate downstream geometry by delta_r = parity * delta_q * leg_direction instead. No geometry was modified."
+    }
+  }
+}

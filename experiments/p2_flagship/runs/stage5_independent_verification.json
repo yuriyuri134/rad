@@ -1,0 +1,349 @@
+{
+  "rc_analytical_and_abcd_check": {
+    "abcd_s0_efl_mm": 6000.000001,
+    "abcd_s0_bfl_from_m2_mm": 1939.024391,
+    "expected_bfl_from_m2_mm": 1939.02439,
+    "seidel_SI": 2.1e-09,
+    "seidel_SII": -0.0
+  },
+  "corrector_abcd_cross_checks": [
+    {
+      "branch_id": "S1_2Lens_FS_RC",
+      "abcd_efl_mm": 6012.6933,
+      "optiland_efl_mm": 6012.697,
+      "efl_diff_mm": 0.0037,
+      "abcd_paraxial_bfl_mm": 57.9207,
+      "optimized_bfl_mm": 57.789,
+      "defocus_from_paraxial_mm": -0.1317
+    },
+    {
+      "branch_id": "S2_3Lens_Wynne_FS_RC",
+      "abcd_efl_mm": 6007.6936,
+      "optiland_efl_mm": 6007.695,
+      "efl_diff_mm": 0.0014,
+      "abcd_paraxial_bfl_mm": 55.1307,
+      "optimized_bfl_mm": 55.0,
+      "defocus_from_paraxial_mm": -0.1307
+    },
+    {
+      "branch_id": "S3_3Lens_Wynne_FS_QuasiRC",
+      "abcd_efl_mm": 6001.5951,
+      "optiland_efl_mm": 6001.598,
+      "efl_diff_mm": 0.0029,
+      "abcd_paraxial_bfl_mm": 55.0503,
+      "optimized_bfl_mm": 55.0,
+      "defocus_from_paraxial_mm": -0.0503
+    },
+    {
+      "branch_id": "S4_3Lens_Wynne_FS_F2_RC",
+      "abcd_efl_mm": 5987.0183,
+      "optiland_efl_mm": 5987.006,
+      "efl_diff_mm": 0.0123,
+      "abcd_paraxial_bfl_mm": 55.3607,
+      "optimized_bfl_mm": 55.001,
+      "defocus_from_paraxial_mm": -0.3597
+    }
+  ],
+  "fits_header_and_wcs_audit": [
+    {
+      "file": "S0_bare_rc_tile_0.00deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5157,
+      "finite_all": true,
+      "min_adu": 64.4,
+      "max_adu": 9500.84
+    },
+    {
+      "file": "S0_bare_rc_tile_0.25deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5157,
+      "finite_all": true,
+      "min_adu": 67.62,
+      "max_adu": 1879.79
+    },
+    {
+      "file": "S0_bare_rc_tile_0.42deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5157,
+      "finite_all": true,
+      "min_adu": 64.85,
+      "max_adu": 412.24
+    },
+    {
+      "file": "S0_bare_rc_tile_0.60deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5157,
+      "finite_all": true,
+      "min_adu": 66.06,
+      "max_adu": 178.89
+    },
+    {
+      "file": "S1_2Lens_FS_RC_tile_0.00deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5146,
+      "finite_all": true,
+      "min_adu": 67.23,
+      "max_adu": 8770.88
+    },
+    {
+      "file": "S1_2Lens_FS_RC_tile_0.25deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5146,
+      "finite_all": true,
+      "min_adu": 65.95,
+      "max_adu": 10203.12
+    },
+    {
+      "file": "S1_2Lens_FS_RC_tile_0.42deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5146,
+      "finite_all": true,
+      "min_adu": 66.92,
+      "max_adu": 14762.24
+    },
+    {
+      "file": "S1_2Lens_FS_RC_tile_0.60deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5146,
+      "finite_all": true,
+      "min_adu": 65.89,
+      "max_adu": 11843.1
+    },
+    {
+      "file": "S2_3Lens_Wynne_FS_RC_tile_0.00deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.515,
+      "finite_all": true,
+      "min_adu": 64.68,
+      "max_adu": 9577.41
+    },
+    {
+      "file": "S2_3Lens_Wynne_FS_RC_tile_0.25deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.515,
+      "finite_all": true,
+      "min_adu": 67.25,
+      "max_adu": 11409.03
+    },
+    {
+      "file": "S2_3Lens_Wynne_FS_RC_tile_0.42deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.515,
+      "finite_all": true,
+      "min_adu": 65.65,
+      "max_adu": 11255.93
+    },
+    {
+      "file": "S2_3Lens_Wynne_FS_RC_tile_0.60deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.515,
+      "finite_all": true,
+      "min_adu": 62.89,
+      "max_adu": 14851.82
+    },
+    {
+      "file": "S3_3Lens_Wynne_FS_QuasiRC_tile_0.00deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5155,
+      "finite_all": true,
+      "min_adu": 64.4,
+      "max_adu": 9493.06
+    },
+    {
+      "file": "S3_3Lens_Wynne_FS_QuasiRC_tile_0.25deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5155,
+      "finite_all": true,
+      "min_adu": 64.98,
+      "max_adu": 10179.57
+    },
+    {
+      "file": "S3_3Lens_Wynne_FS_QuasiRC_tile_0.42deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5155,
+      "finite_all": true,
+      "min_adu": 61.43,
+      "max_adu": 15220.08
+    },
+    {
+      "file": "S3_3Lens_Wynne_FS_QuasiRC_tile_0.60deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5155,
+      "finite_all": true,
+      "min_adu": 67.5,
+      "max_adu": 17692.03
+    },
+    {
+      "file": "S4_3Lens_Wynne_FS_F2_RC_tile_0.00deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5168,
+      "finite_all": true,
+      "min_adu": 65.58,
+      "max_adu": 4954.07
+    },
+    {
+      "file": "S4_3Lens_Wynne_FS_F2_RC_tile_0.25deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5168,
+      "finite_all": true,
+      "min_adu": 64.98,
+      "max_adu": 11772.5
+    },
+    {
+      "file": "S4_3Lens_Wynne_FS_F2_RC_tile_0.42deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5168,
+      "finite_all": true,
+      "min_adu": 66.17,
+      "max_adu": 10503.42
+    },
+    {
+      "file": "S4_3Lens_Wynne_FS_F2_RC_tile_0.60deg.fits",
+      "shape": [
+        512,
+        512
+      ],
+      "ctype": [
+        "RA---TAN",
+        "DEC--TAN"
+      ],
+      "pix_scale_arcsec": 0.5168,
+      "finite_all": true,
+      "min_adu": 66.52,
+      "max_adu": 9804.92
+    }
+  ]
+}
