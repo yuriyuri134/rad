@@ -72,6 +72,11 @@ import {
   updateRunEvaluations,
 } from './server/storage.ts';
 
+import { ResearchEngine } from './server/research_engine.ts';
+import { installResearchRoutes } from './server/research_routes.ts';
+import { validateContract } from './server/research_store.ts';
+import type { ArtifactContract } from './src/core/researchTypes.ts';
+
 async function startServer() {
   recoverInterruptedMigrations();
   ensureWorkspaceInitialized();
@@ -92,6 +97,9 @@ async function startServer() {
     next();
   });
   app.use(express.json({ limit: '15mb' }));
+  const research = new ResearchEngine();
+  research.store.recoverInterrupted();
+  installResearchRoutes(app, research);
 
   app.get('/api/environment', async (_req, res) => {
     try {
@@ -385,7 +393,7 @@ async function startServer() {
 
   app.post('/api/components/create', (req, res) => {
     try {
-      const { id, name, kind, runtime, summary, purpose, capabilityBoundary, codeContent } = req.body as {
+      const { id, name, kind, runtime, summary, purpose, capabilityBoundary, codeContent, artifactContract } = req.body as {
         id: string;
         name: string;
         kind: string;
@@ -394,7 +402,9 @@ async function startServer() {
         purpose: string;
         capabilityBoundary?: string;
         codeContent: string;
+        artifactContract?: ArtifactContract;
       };
+      if (artifactContract !== undefined) validateContract(artifactContract);
       const dossier = createNewComponent({
         id,
         name,
@@ -404,6 +414,7 @@ async function startServer() {
         purpose,
         capabilityBoundary,
         codeContent,
+        artifactContract,
       });
       res.json({ dossier, components: listComponents() });
     } catch (err) {

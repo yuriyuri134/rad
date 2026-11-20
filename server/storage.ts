@@ -1939,6 +1939,7 @@ export function forkComponentVersion(
     params: params.updatedParams,
     codeFile: baseRecord.codeFile,
     approval: null,
+    artifactContract: baseRecord.artifactContract,
     lifecycle: 'draft',
     frozenAt: null,
     frozenByRunIds: [],

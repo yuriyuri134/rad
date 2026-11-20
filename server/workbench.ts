@@ -1653,6 +1653,7 @@ export function createNewComponent(
     purpose: string;
     capabilityBoundary?: string;
     codeContent: string;
+    artifactContract?: import('../src/core/researchTypes.ts').ArtifactContract;
   },
   workspaceDir?: string,
 ): ComponentDossier {
@@ -1705,6 +1706,7 @@ export function createNewComponent(
         params: {},
         codeFile,
         approval: null,
+        artifactContract: input.artifactContract,
         lifecycle: 'draft',
         sourceAvailability: 'available_on_disk',
       },

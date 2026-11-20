@@ -13,3 +13,11 @@
 ## 交付基线
 
 Git 基线 `90a034d` 缺少旧交付清单登记的 `studies.json` 和 `arch_annotations.json`，已有 `jobs.json` 的哈希也与旧清单不等。保留该清单作为旧交付证据。工作台在独立数据目录初始化缺失的运行时资料。可比较 Git 原始 blob、A1 冻结账本及历史科研产物的 SHA-256。
+
+## 文件执行协议
+
+组件版本的 artifactContract 声明 openlab-files/v1、命名输入输出、媒体类型、Schema ID，可选 JSON Schema、参数约束和 Python 包版本。批准后，可由研究工作台或 /api/research/executions 执行。CLI 从 stdin 读取 inputs、parameters、outputDir 和 manifestPath。inputs 的每个端口包含产物 ID、哈希、媒体类型、Schema ID 和一个本次运行的本地副本路径。组件写入 outputDir，再向 manifestPath 保存一个形如 {"outputs":{"report":"report.json"}} 的小型清单。stdout 和 stderr 用于日志。
+
+一次执行的全部输出只有在发布完成记录后才可见。产物、源码和声明依赖按内容哈希归档。已结束的记录保留自己的端口、参数和运行环境快照。输入必须通过媒体类型、Schema ID、适用的 JSON Schema 和哈希校验。传入上次运行的配方及需复跑的步骤，可复用已有上游和互不依赖的执行。中断时以已发布的执行记录为依据恢复。
+
+同一个数据目录由一个工作台服务进程负责。科研执行归档位于 workspace/workbench/research，可通过 OPENLAB_WORKSPACE_DIR 移到持久化数据目录。

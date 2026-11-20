@@ -31,7 +31,7 @@ export function stopChild(child: ChildProcess): void {
   child.once('exit', () => clearTimeout(timer));
 }
 
-export function stageVerifiedPython(entry: string, sources: Record<string, VerifiedSource>) {
+export function stageVerifiedSources(entry: string, sources: Record<string, VerifiedSource>) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-python-'));
   const dispose = () => fs.rmSync(directory, { recursive: true, force: true });
   try {
@@ -49,12 +49,17 @@ export function stageVerifiedPython(entry: string, sources: Record<string, Verif
     dispose();
     throw error;
   }
+  return { directory, entry: path.join(directory, entry), dispose };
+}
+
+export function stageVerifiedPython(entry: string, sources: Record<string, VerifiedSource>) {
+  const stage = stageVerifiedSources(entry, sources);
   const args = [
     '-I', '-B', '-u', '-c',
     'import os, runpy, sys; entry = sys.argv.pop(1); sys.argv[0] = entry; sys.path.insert(0, os.path.dirname(entry)); runpy.run_path(entry, run_name="__main__")',
-    path.join(directory, entry),
+    stage.entry,
   ];
-  return { directory, args, dispose };
+  return { ...stage, args };
 }
 
 export function pythonEnvironment(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
@@ -68,9 +73,14 @@ export function runLocalProcess(
   input: string,
   timeoutMs: number,
   env: NodeJS.ProcessEnv = process.env,
+  options: { cwd?: string; signal?: AbortSignal; log?: (chunk: Buffer) => void; maxBuffer?: number } = {},
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    if (options.signal?.aborted) {
+      reject(new Error('执行已取消'));
+      return;
+    }
+    const child = spawn(executable, args, { cwd: options.cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
     const streams = [child.stdout, child.stderr];
     const buffers = [Buffer.alloc(0), Buffer.alloc(0)];
     let failure: Error | undefined;
@@ -80,9 +90,17 @@ export function runLocalProcess(
       stopChild(child);
     };
     const timer = setTimeout(() => abort(new Error('执行超出时间预算')), timeoutMs);
+    const cancel = () => abort(new Error('执行已取消'));
+    options.signal?.addEventListener('abort', cancel, { once: true });
     streams.forEach((stream, index) => stream.on('data', (chunk: Buffer) => {
       if (failure) return;
-      if (buffers[index].byteLength + chunk.byteLength > 16 * 1024 * 1024) {
+      try {
+        options.log?.(chunk);
+      } catch (error) {
+        abort(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
+      if (buffers[index].byteLength + chunk.byteLength > (options.maxBuffer ?? 16 * 1024 * 1024)) {
         abort(new Error('执行输出超出缓冲区限制'));
         return;
       }
@@ -94,6 +112,7 @@ export function runLocalProcess(
     });
     child.once('close', (code) => {
       clearTimeout(timer);
+      options.signal?.removeEventListener('abort', cancel);
       const [stdout, stderr] = buffers.map((buffer) => buffer.toString('utf8'));
       if (failure) reject(failure);
       else if (code === 0 || stdout.trimStart().startsWith('{')) resolve({ stdout, stderr, exitCode: code ?? 1 });

@@ -104,6 +104,7 @@ export interface ComponentVersionRecord {
   params: Record<string, number | string | boolean>;
   codeFile: string;
   approval?: CodeSecurityReviewState | null;
+  artifactContract?: import('./researchTypes.ts').ArtifactContract;
   lifecycle?: ComponentVersionLifecycle;
   frozenAt?: string | null;
   frozenByRunIds?: string[];
