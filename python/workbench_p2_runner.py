@@ -26,8 +26,9 @@ from typing import Any
 
 warnings.filterwarnings("ignore")
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-P2_SCRIPTS_DIR = REPO_ROOT / "experiments" / "p2_flagship" / "scripts"
+SOURCE_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(os.environ.get("OPENLAB_LEGACY_DATA_ROOT", SOURCE_ROOT)).resolve()
+P2_SCRIPTS_DIR = SOURCE_ROOT / "experiments" / "p2_flagship" / "scripts"
 P2_RUNS_DIR = REPO_ROOT / "experiments" / "p2_flagship" / "runs"
 
 if str(P2_SCRIPTS_DIR) not in sys.path:
@@ -50,6 +51,8 @@ def get_package_versions() -> dict[str, str | None]:
 
 def load_p2_branch_prescription(branch_key: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     key = branch_key.strip().upper()
+    if key not in {"S1", "S2", "S3", "S4"}:
+        raise ValueError("Expected an existing S1-S4 prescription")
     branch_file = P2_RUNS_DIR / f"branch_{key}.json"
     if branch_file.exists():
         with branch_file.open("r", encoding="utf-8") as fh:
@@ -58,10 +61,7 @@ def load_p2_branch_prescription(branch_key: str) -> tuple[dict[str, Any], list[d
         v2_file = P2_RUNS_DIR / "S1_to_S4_correctors_v2.json"
         with v2_file.open("r", encoding="utf-8") as fh:
             all_v2 = json.load(fh)
-        matched = next(
-            (b for b in all_v2.get("branches", []) if b.get("branch_key") == key),
-            None,
-        )
+        matched = all_v2.get(key)
         if not matched:
             raise FileNotFoundError(f"未找到 P2 光学分支处方 {branch_key}")
         data = matched
@@ -244,7 +244,7 @@ def run_fits_star_extract(params: dict[str, Any]) -> dict[str, Any]:
 
     rel_path = str(params.get("fitsPath", "experiments/p2_flagship/runs/fits/S3_3Lens_Wynne_FS_QuasiRC_tile_0.60deg.fits"))
     abs_path = (REPO_ROOT / rel_path).resolve()
-    if not abs_path.exists() or not str(abs_path).startswith(str(REPO_ROOT.resolve())):
+    if not abs_path.is_file() or not abs_path.is_relative_to((P2_RUNS_DIR / "fits").resolve()):
         raise FileNotFoundError(f"非法的 FITS 文件路径: {rel_path}")
 
     extractor = str(params.get("extractor", "photutils_DAOStarFinder"))
@@ -511,8 +511,6 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
         ref_tile = stage3_ref_by_file.get(abs_path.name, {})
         ref_phot = ref_tile.get("photutils", {})
         ref_sep = ref_tile.get("sep", {})
-        n_truth = int(ref_sep.get("n_truth") or ref_phot.get("n_truth") or 28)
-        dao_vs_truth_pct = round(100.0 * min(matched_count, n_truth) / max(1, n_truth), 1)
 
         tile_results.append(
             {
@@ -526,7 +524,7 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
                 "sepCount": sep_count,
                 "daoMatchedToSep": matched_count,
                 "daoVsSepMatchPct": match_vs_sep_pct,
-                "daoVsTruthRefPct": dao_vs_truth_pct,
+                "daoVsTruthRefPct": None,
                 "daoUnmatchedExcess": unmatched_excess,
                 "daoMedianFwhmPx": med_fwhm_px,
                 "daoMedianFwhmArcsec": med_fwhm_as,
@@ -540,7 +538,6 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
 
     mean_match_sep = round(sum(t["daoVsSepMatchPct"] for t in tile_results) / len(tile_results), 1)
     min_match_sep = round(min(t["daoVsSepMatchPct"] for t in tile_results), 1)
-    mean_dao_vs_truth = round(sum(t["daoVsTruthRefPct"] for t in tile_results) / len(tile_results), 1)
     total_excess = sum(t["daoUnmatchedExcess"] for t in tile_results)
     stage3_dao_vals = [float(t["stage3Dao3pxCompletenessPct"]) for t in tile_results if t["stage3Dao3pxCompletenessPct"] is not None]
     mean_stage3_dao = round(sum(stage3_dao_vals) / len(stage3_dao_vals), 1) if stage3_dao_vals else None
@@ -566,7 +563,8 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
         "tilesCount": len(tile_results),
         "meanDaoMatchedToSepPct": mean_match_sep,
         "minDaoMatchedToSepPct": min_match_sep,
-        "meanDaoVsTruthRefPct": mean_dao_vs_truth,
+        "meanDaoVsTruthRefPct": None,
+        "metricBasis": "SEP proxy cross-match; independent per-star truth unavailable",
         "totalDaoUnmatchedExcess": total_excess,
         "meanStage3Dao3pxPct": mean_stage3_dao,
         "meanStage3SepPct": mean_stage3_sep,

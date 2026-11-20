@@ -20,7 +20,9 @@ import type {
   StudyOpenQuestion,
   WorkflowExecution,
 } from '../src/core/types.ts';
-import { inspectDiscoveredPythonRuntime, resolvePythonBinary } from './python_env.ts';
+import { inspectDiscoveredPythonRuntime } from './python_env.ts';
+import { projectScienceCorrections, stage4Metrics, fitsProxyCaveat, s2ScienceSummary, s2SummaryArtifactId, type S2Prescription, type Stage4 } from './science_evidence.ts';
+import { pythonEnvironment, readVerifiedSource, stageVerifiedPython, stopChild } from './process.ts';
 import {
   atomicWriteFileSync,
   getComponent,
@@ -113,7 +115,26 @@ function safeReadRepoJson<T>(repoRoot: string, relPath: string): { data: T; sha2
   }
 }
 
+const s2Path = 'experiments/p2_flagship/runs/branch_S2.json';
+function readS2Evidence(repoRoot: string) {
+  const result = safeReadRepoJson<S2Prescription>(repoRoot, s2Path);
+  return result?.sha256 === '03984b94739c92a4ec468ee5109687aa971e5fa71d80fef035dad6aa28c83cef' ? result : null;
+}
+
+const stage4Path = 'experiments/p2_flagship/runs/stage4_tolerancing.json';
+function readStage4Evidence(repoRoot: string) {
+  const result = safeReadRepoJson<Stage4>(repoRoot, stage4Path);
+  return result?.sha256 === '955cd06883ba40a57e8001c086013746eaf73e1e2abe0246a092ab2a62318b0c' ? result : null;
+}
+
 const activeProcesses = new Map<string, ChildProcess>();
+const legacyP2Entry = 'python/workbench_p2_runner.py';
+const legacyP2SourceHashes = {
+  [legacyP2Entry]: '38bf6aa0286ceac33c9c66467cec5df80413f2c30b690a8e3c4f52e92c6c4ce0',
+  'experiments/p2_flagship/scripts/wf_rc_models.py': '8baeeed8bf4157b8e9736be9cb211f7387d4d7142aa3d35b6d08f1880d4d4637',
+  'experiments/p2_flagship/scripts/stage4_tolerancing.py': 'c85f868be3f742f0567def4bb4a069b1aab76772db24428733a2e7f3672420eb',
+  'experiments/p2_flagship/scripts/stage2_corrector_v2.py': '27ce811e53b1bfc81e65f9271dfc8521ac4feeb45f96cef46a40d4450f942e03',
+};
 
 export function reconcileOrphanedAsyncJobs(workspaceDir?: string): void {
   const paths = getWorkbenchPaths(workspaceDir);
@@ -166,10 +187,7 @@ export function ensureWorkbenchInitialized(workspaceDir?: string): void {
     repoRoot,
     'experiments/p2_flagship/runs/S1_to_S4_correctors_v2.json',
   );
-  const s3Stage4Res = safeReadRepoJson<Record<string, unknown>>(
-    repoRoot,
-    'experiments/p2_flagship/runs/stage4_tolerancing.json',
-  );
+  const s3Stage4Res = readStage4Evidence(repoRoot);
   const stage3Res = safeReadRepoJson<{
     systems?: Record<string, { efl_mm?: number; max_distortion_offset_um?: number; tiles?: Array<Record<string, unknown>> }>;
   }>(repoRoot, 'experiments/p2_flagship/runs/stage3_fits_astrometry.json');
@@ -283,7 +301,7 @@ export function ensureWorkbenchInitialized(workspaceDir?: string): void {
       name: 'S2 三片 Wynne 全熔石英校正镜 (锁定 RC 圆锥系数)',
       hypothesis: '固定主次镜纯 RC K1/K2，引入经典三片式 Wynne 校正组，验证全视场衍射性能。',
       status: 'exploring',
-      summary: '全视场 RMS 压至 1.855–2.297 μm，0.0°–0.60° 550nm Strehl 达到 0.870–0.922，通过全部主要光学指标，是纯 RC 镜面约束下最优构型。',
+      summary: s2ScienceSummary(readS2Evidence(repoRoot)?.data).summary,
       stage3SysKey: 'S2_3Lens_Wynne_FS_RC',
     },
     {
@@ -305,10 +323,6 @@ export function ensureWorkbenchInitialized(workspaceDir?: string): void {
   ];
 
   const stage3Systems = stage3Res?.data?.systems ?? {};
-  const stage4Data = (s3Stage4Res?.data ?? {}) as Record<string, unknown>;
-  const mcNoShim = (stage4Data.mc_bfl_only_40trials ?? {}) as Record<string, unknown>;
-  const mcWithShim = (stage4Data.mc_m2_shim_plus_bfl_40trials ?? {}) as Record<string, unknown>;
-
   for (const spec of branchSpecs) {
     const raw = (s14[spec.key] ?? {}) as Record<string, unknown>;
     const m = (raw.metrics ?? {}) as Record<string, unknown>;
@@ -351,12 +365,7 @@ export function ensureWorkbenchInitialized(workspaceDir?: string): void {
           : null,
     };
 
-    if (spec.key === 'S3') {
-      metricsObj.mcBflOnlyP50RmsUm = Number(mcNoShim.max_rms_um_p50 ?? 5.125);
-      metricsObj.mcBflOnlyYield7_5Pct = Number(mcNoShim.yield_max_rms_le_7_5um_pct ?? 75.0);
-      metricsObj.mcM2ShimP50RmsUm = Number(mcWithShim.max_rms_um_p50 ?? 3.842);
-      metricsObj.mcM2ShimYield7_5Pct = Number(mcWithShim.yield_max_rms_le_7_5um_pct ?? 100.0);
-    }
+    if (spec.key === 'S3') Object.assign(metricsObj, stage4Metrics(s3Stage4Res?.data));
 
     const branchArtIds: string[] = [];
     if (s14Res) branchArtIds.push('art-p2-s1-s4-v2');
@@ -541,7 +550,7 @@ export function ensureWorkbenchInitialized(workspaceDir?: string): void {
         title: 'OAT 敏感度、补偿策略重构与 40 次蒙特卡洛良率验证',
         status: 'completed',
         summary: '识别 M1 R1 +/-1.5mm 为最大敏感源；发现仅用 BFL 调焦会将边缘 Strehl 压至 0.616，改写为 M2 垫片+BFL 后恢复至 0.9855。',
-        keyFinding: 'Monte Carlo (40 trials) 良率由 75.0% (仅 BFL) 跃升至 100.0% (M2 垫片+BFL, P95 RMS=6.079 μm)。',
+        keyFinding: '补偿策略的 P50、P95 和通过率可在 Stage 4 原始产物中复核。',
         primaryArtifactIds: ['art-p2-stage4-tol'],
       },
       {
@@ -886,17 +895,22 @@ export function listWorkbenchData(workspaceDir?: string) {
   const studies = dedupeById([...wbStudies, ...(p1.study ? [p1.study] : [])]);
   const branches = dedupeById([...wbBranches, ...p1.branches]);
   const executions = dedupeById([...wbExecutions, ...p1.executions]);
-  const artifacts = dedupeById(wbArtifacts);
+  const s2 = readS2Evidence(resolveRepoRoot());
+  const s2Branch = branches.find((branch) => branch.id === 'branch-p2-s2');
+  const s2Artifact: ArtifactRef | null = s2 && s2Branch ? {
+    id: s2SummaryArtifactId, studyId: s2Branch.studyId, branchId: s2Branch.id, executionId: 'exec-p2-s2',
+    kind: 'optical_prescription_json', title: 'S2 原始处方及逐视场指标',
+    relativePath: s2Path, sha256: s2.sha256, byteLength: s2.bytes,
+    provenanceTier: 'external_verified_import', createdAt: s2Branch.createdAt,
+  } : null;
+  const artifacts = dedupeById([...(s2Artifact ? [s2Artifact] : []), ...wbArtifacts]);
   const notes = dedupeById([...wbNotes, ...p1.notes]);
   const fitsCatalog = listFitsCatalog();
   const pythonRuntime = inspectDiscoveredPythonRuntime();
 
   return {
-    studies,
-    branches,
-    executions,
+    ...projectScienceCorrections(studies, branches, executions, notes, readStage4Evidence(resolveRepoRoot())?.data, s2?.data),
     artifacts,
-    notes,
     jobs,
     fitsCatalog,
     annotations,
@@ -1169,18 +1183,7 @@ export function cancelAsyncJob(jobId: string, workspaceDir?: string): AsyncJobRe
     },
     workspaceDir,
   );
-  if (proc) {
-    proc.kill('SIGTERM');
-    setTimeout(() => {
-      if (!proc.killed) {
-        try {
-          proc.kill('SIGKILL');
-        } catch {
-          // ignore
-        }
-      }
-    }, 1500);
-  }
+  if (proc) stopChild(proc);
   return updated;
 }
 
@@ -1253,18 +1256,25 @@ export function startAsyncWorkbenchJob(
     durationMs: null,
   };
 
-  const jobs = readJsonFile<AsyncJobRecord[]>(paths.jobsFile, []);
-  jobs.push(initialJob);
-  persistJobsList(jobs, workspaceDir);
+  const repoRoot = resolveRepoRoot();
+  const sources = Object.fromEntries(Object.entries(legacyP2SourceHashes).map(([relative, hash]) =>
+    [relative, readVerifiedSource(path.join(repoRoot, relative), hash)]
+  ));
+  const staged = stageVerifiedPython(legacyP2Entry, sources);
+  const logFilePath = path.join(paths.logsDir, jobId + '.log');
+  try {
+    const jobs = readJsonFile<AsyncJobRecord[]>(paths.jobsFile, []);
+    jobs.push(initialJob);
+    atomicWriteFileSync(logFilePath, initialJob.logs.join('\n') + '\n');
+    persistJobsList(jobs, workspaceDir);
+  } catch (error) {
+    staged.dispose();
+    throw error;
+  }
 
-  const logFilePath = path.join(paths.logsDir, `${jobId}.log`);
-  atomicWriteFileSync(logFilePath, initialJob.logs.join('\n') + '\n');
-
-  const runnerScript = path.resolve(resolveRepoRoot(), 'python', 'workbench_p2_runner.py');
-  const { executable } = resolvePythonBinary();
-  const child = spawn(executable, ['-u', runnerScript, '--mode', input.runnerMode], {
-    cwd: resolveRepoRoot(),
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
+  const child = spawn(pythonInfo.executable, [...staged.args, '--mode', input.runnerMode], {
+    cwd: repoRoot,
+    env: pythonEnvironment({ OPENLAB_LEGACY_DATA_ROOT: repoRoot }),
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   activeProcesses.set(jobId, child);
@@ -1312,23 +1322,19 @@ export function startAsyncWorkbenchJob(
   const timer = setTimeout(() => {
     timedOut = true;
     appendLog(`[timeout] 达到计算时间预算 (${timeoutMs} ms)，发送 SIGTERM 终止进程`);
-    child.kill('SIGTERM');
-    setTimeout(() => {
-      if (!child.killed) {
-        try {
-          child.kill('SIGKILL');
-        } catch {
-          // ignore
-        }
-      }
-    }, 1500);
+    stopChild(child);
   }, timeoutMs);
 
-  child.stdin.write(JSON.stringify(input.parameters ?? {}));
-  child.stdin.end();
+  let processError: Error | undefined;
+  child.on('error', (error) => { processError = error; });
+  child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code !== 'EPIPE') processError = error;
+  });
+  child.stdin.end(JSON.stringify(input.parameters ?? {}));
 
   child.on('close', (code) => {
     clearTimeout(timer);
+    staged.dispose();
     activeProcesses.delete(jobId);
     if (stdoutRemainder) appendLog(stdoutRemainder);
     if (stderrRemainder) appendLog(`[stderr] ${stderrRemainder}`);
@@ -1355,13 +1361,13 @@ export function startAsyncWorkbenchJob(
       return;
     }
 
-    if (code !== 0 || !resultJsonLine) {
+    if (processError || code !== 0 || !resultJsonLine) {
       updateJobRecord(
         jobId,
         (cur) => ({
           ...cur,
           status: 'failed',
-          errorMessage: `Python 子进程退出异常 (code=${code})，未返回有效计算载荷`,
+          errorMessage: processError?.message ?? ('Python 子进程退出异常，状态码 ' + code),
           finishedAt,
           durationMs,
         }),
@@ -1372,6 +1378,7 @@ export function startAsyncWorkbenchJob(
 
     try {
       const parsedOutput = JSON.parse(resultJsonLine) as Record<string, unknown>;
+      if (parsedOutput.status !== 'ok') throw new Error('Python 未成功完成计算');
       const persisted = persistJobArtifactsAndBranch({
         job: currentJob ?? initialJob,
         output: parsedOutput,
@@ -1553,7 +1560,6 @@ function persistJobArtifactsAndBranch(params: {
     const tilesCount = Number(params.output.tilesCount ?? 0);
     const meanMatch = Number(params.output.meanDaoMatchedToSepPct ?? 0);
     const minMatch = Number(params.output.minDaoMatchedToSepPct ?? 0);
-    const meanTruth = Number(params.output.meanDaoVsTruthRefPct ?? 0);
     const totalExcess = Number(params.output.totalDaoUnmatchedExcess ?? 0);
     const stage3Dao =
       params.output.meanStage3Dao3pxPct !== null && params.output.meanStage3Dao3pxPct !== undefined
@@ -1563,26 +1569,22 @@ function persistJobArtifactsAndBranch(params: {
       fitsBatchTilesCount: tilesCount,
       batchMeanDaoMatchPct: meanMatch,
       batchMinDaoMatchPct: minMatch,
-      batchMeanDaoTruthPct: meanTruth,
       batchStage3Dao3pxPct: stage3Dao,
       batchDaoUnmatchedExcess: totalExcess,
       fwhmPx: Number(outParams.fwhmPx ?? 1.5),
     };
-    summary = `批量 FITS 欠采样横评 (${tilesCount} 帧, DAO fwhm=${metrics.fwhmPx}px): 相对 SEP 均匹配率 ${meanMatch}% (最低 ${minMatch}%, Stage3 DAO 3px均值 ${stage3Dao ?? '?'}%), 额外未匹配余项 ${totalExcess}`;
+    summary = `批量 FITS 欠采样横评 (${tilesCount} 帧, DAO fwhm=${metrics.fwhmPx}px): 相对 SEP 均匹配率 ${meanMatch}% (最低 ${minMatch}%, Stage3 DAO 3px均值 ${stage3Dao ?? '?'}%), 额外未匹配余项 ${totalExcess}。 ${fitsProxyCaveat}`;
   } else {
     const nDet = Number(params.output.detectedCount ?? 0);
-    const nTruth = Number(params.output.truthStarCountHeader ?? 28);
-    const completeness = Math.round((nDet / Math.max(1, nTruth)) * 1000) / 10;
     metrics = {
       detectedCount: nDet,
-      estimatedCompletenessPct: completeness,
       medianFwhmPx: params.output.medianFwhmPx !== undefined ? Number(params.output.medianFwhmPx) : null,
       medianFwhmArcsec: params.output.medianFwhmArcsec !== undefined ? Number(params.output.medianFwhmArcsec) : null,
       extractor: String(params.output.extractor ?? ''),
       fitsPath: String(params.output.fitsPath ?? ''),
       medianSkyAdu: Number(params.output.medianSkyAdu ?? 0),
     };
-    summary = `${params.output.extractor} 实时星表提取 (${path.basename(String(params.output.fitsPath ?? ''))}): 检出 ${nDet} 个点源 (参照 ~${completeness}%), median FWHM=${metrics.medianFwhmPx ?? '?'} px (${metrics.medianFwhmArcsec ?? '?'}")`;
+    summary = `${params.output.extractor} 实时星表提取 (${path.basename(String(params.output.fitsPath ?? ''))}): 检出 ${nDet} 个点源, median FWHM=${metrics.medianFwhmPx ?? '?'} px (${metrics.medianFwhmArcsec ?? '?'}")`;
   }
 
   const branch: StudyBranch = {
@@ -1665,6 +1667,7 @@ export function createNewComponent(
     purpose: string;
     capabilityBoundary?: string;
     codeContent: string;
+    artifactContract?: import('../src/core/researchTypes.ts').ArtifactContract;
   },
   workspaceDir?: string,
 ): ComponentDossier {
@@ -1716,6 +1719,8 @@ export function createNewComponent(
         codeHash,
         params: {},
         codeFile,
+        approval: null,
+        artifactContract: input.artifactContract,
         lifecycle: 'draft',
         sourceAvailability: 'available_on_disk',
       },
@@ -1732,10 +1737,10 @@ export function createNewComponent(
       caveats: [],
     },
     codeSecurityReview: {
-      status: 'user_approved_hash',
-      approvedHash: codeHash,
-      reviewedBy: 'rad',
-      reviewedAt: now,
+      status: 'unreviewed_modified',
+      approvedHash: null,
+      reviewedBy: null,
+      reviewedAt: null,
       executionModelNote: '工作台新建源码已记录完整 64 位 SHA-256 指纹',
     },
   };
@@ -1814,16 +1819,28 @@ export function readArtifactJson(artifactId: string, workspaceDir?: string): Rec
   ensureWorkbenchInitialized(workspaceDir);
   const paths = getWorkbenchPaths(workspaceDir);
   const artifacts = readJsonlFile<ArtifactRef>(paths.artifactsFile);
+  if (artifactId === s2SummaryArtifactId) {
+    const evidence = readS2Evidence(resolveRepoRoot());
+    if (!evidence) throw new Error('S2 原始产物不存在或 SHA-256 不匹配');
+    return evidence.data;
+  }
   const art = artifacts.find((a) => a.id === artifactId);
   if (!art) {
     throw new Error(`未找到产物记录 ${artifactId}`);
   }
-  const candidateInWb = path.join(paths.generatedArtifactsDir, path.basename(art.relativePath));
-  const candidateInRepo = path.resolve(resolveRepoRoot(), art.relativePath);
-  const target = fs.existsSync(candidateInWb) ? candidateInWb : candidateInRepo;
-  if (!fs.existsSync(target)) {
+  const native = art.provenanceTier === 'workbench_native';
+  const root = native ? paths.generatedArtifactsDir : path.resolve(resolveRepoRoot(), 'experiments');
+  const target = native
+    ? path.resolve(root, path.basename(art.relativePath))
+    : path.resolve(resolveRepoRoot(), art.relativePath);
+  const relative = path.relative(fs.realpathSync(root), fs.existsSync(target) ? fs.realpathSync(target) : target);
+  if (relative.startsWith('..') || path.isAbsolute(relative) || !fs.existsSync(target)) {
     throw new Error(`产物文件不存在: ${art.relativePath}`);
   }
-  return JSON.parse(fs.readFileSync(target, 'utf8')) as Record<string, unknown>;
+  const raw = fs.readFileSync(target);
+  if (crypto.createHash('sha256').update(raw).digest('hex') !== art.sha256) {
+    throw new Error('产物 SHA-256 不匹配: ' + artifactId);
+  }
+  return JSON.parse(raw.toString('utf8')) as Record<string, unknown>;
 }
 

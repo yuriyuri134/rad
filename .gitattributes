@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.fits -text
+workspace/runs.jsonl -text
+workspace/immutable_store/** -text

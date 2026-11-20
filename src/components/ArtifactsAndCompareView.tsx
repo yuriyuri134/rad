@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Database, FileCode2, GitCompare, Telescope } from 'lucide-react';
 import type {
   ArtifactRef,
@@ -97,15 +97,21 @@ export function ArtifactsAndCompareView({
     [branches],
   );
 
-  const stage4Data = useMemo(() => {
-    return [
-      { label: '标称 S3 设计', uncomp: 1.079, bflOnly: 1.079, m2Shim: 1.079, strehlBfl: 0.9819, strehlShim: 0.9819 },
-      { label: 'M1 R1 +1.5mm', uncomp: 353.687, bflOnly: 4.461, m2Shim: 1.208, strehlBfl: 0.616, strehlShim: 0.9855 },
-      { label: 'M2 R2 +1.0mm', uncomp: 93.311, bflOnly: 1.969, m2Shim: 1.19, strehlBfl: 0.9576, strehlShim: 0.984 },
-      { label: 'M1-M2 间距 +0.05mm', uncomp: 26.878, bflOnly: 1.222, m2Shim: 1.08, strehlBfl: 0.9772, strehlShim: 0.982 },
-      { label: 'M2 倾斜 20"', uncomp: 2.016, bflOnly: 2.241, m2Shim: 2.241, strehlBfl: 0.9027, strehlShim: 0.9027 },
-    ];
-  }, []);
+  const stage4Artifact = artifacts.find((artifact) => artifact.id === 'art-p2-stage4-tol');
+  const [stage4, setStage4] = useState<{
+    oat_sensitivities_bfl_12mm?: Array<Record<string, number | string>>;
+    oat_m1_r1_with_m2_shim?: Record<string, number>;
+  } | null>(null);
+  useEffect(() => {
+    if (!stage4Artifact) return;
+    const controller = new AbortController();
+    fetch('/api/fits/inspect-artifact?artifactId=' + encodeURIComponent(stage4Artifact.id), { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((value) => { if (!controller.signal.aborted) setStage4(value); })
+      .catch(() => { if (!controller.signal.aborted) setStage4(null); });
+    return () => controller.abort();
+  }, [stage4Artifact?.id, stage4Artifact?.sha256]);
+  const stage4Metrics = branches.find((branch) => branch.id === 'branch-p2-s3')?.metrics;
 
   const prescriptionBranch =
     branches.find((b) => b.id === selectedPrescriptionBranchId) ??
@@ -261,7 +267,8 @@ export function ArtifactsAndCompareView({
                           <div className="font-semibold text-slate-900">
                             {b.shortCode} · {b.name}
                           </div>
-                          <div className="text-[11px] text-slate-500 max-w-xs truncate">{b.summary}</div>
+                          <div className={b.summaryArtifactId ? 'text-[11px] text-slate-600 max-w-xs' : 'text-[11px] text-slate-500 max-w-xs truncate'}>{b.summary}</div>
+                          {b.summaryArtifactId && <a className="text-[11px] underline" href={'/api/fits/inspect-artifact?artifactId=' + encodeURIComponent(b.summaryArtifactId)}>原始处方与指标</a>}
                         </td>
                         <td className="px-3 py-2.5 font-sans whitespace-nowrap">
                           <span className={`inline-block px-1.5 py-0.5 text-[11px] border rounded-sm ${prov.cls}`}>
@@ -328,7 +335,7 @@ export function ArtifactsAndCompareView({
                         </td>
                         <td className="px-3 py-2.5">
                           {isFitsBatch
-                            ? `Stage3 ${b.metrics.batchStage3Dao3pxPct ?? '?'}%`
+                            ? '—'
                             : fmtNum(b.metrics.mtfEdgeTan, 3)}
                         </td>
                         <td className="px-3 py-2.5">
@@ -337,12 +344,10 @@ export function ArtifactsAndCompareView({
                         <td className="px-3 py-2.5">
                           {isFitsBatch ? (
                             <span className="font-semibold text-emerald-700">
-                              均匹配 {b.metrics.batchMeanDaoMatchPct}%
+                              SEP 代理匹配 {b.metrics.batchMeanDaoMatchPct}%
                             </span>
                           ) : typeof b.metrics.sepCompletenessEdgePct === 'number' ? (
                             `${b.metrics.sepCompletenessEdgePct}%`
-                          ) : typeof b.metrics.estimatedCompletenessPct === 'number' ? (
-                            `~${b.metrics.estimatedCompletenessPct}%`
                           ) : (
                             '—'
                           )}
@@ -479,34 +484,22 @@ export function ArtifactsAndCompareView({
                 <span className="text-xs font-mono text-slate-500">550 nm 边缘 Strehl &amp; Max RMS</span>
               </div>
               <div className="space-y-2.5 pt-1">
-                {stage4Data.map((row) => (
-                  <div key={row.label} className="space-y-1 text-xs">
-                    <div className="flex items-center justify-between font-mono tabular-nums">
-                      <span className="font-sans font-medium text-slate-800">{row.label}</span>
-                      <span className="text-slate-600">
-                        未补偿 {row.uncomp.toFixed(1)}μm → BFL {row.bflOnly.toFixed(2)}μm (Strehl {row.strehlBfl.toFixed(3)}) → 垫片 {row.m2Shim.toFixed(2)}μm (Strehl {row.strehlShim.toFixed(3)})
-                      </span>
+                {(stage4Artifact && stage4?.oat_sensitivities_bfl_12mm || []).map((row) => {
+                  const shim = row.perturbation === 'M1_R1_+1.5mm' ? stage4?.oat_m1_r1_with_m2_shim : undefined;
+                  return (
+                    <div key={String(row.perturbation)} className="text-xs font-mono">
+                      {row.perturbation} · 未补偿平均 RMS {fmtNum(row.uncomp_mean_rms_um)} μm ·
+                      BFL 最大 RMS {fmtNum(row.max_rms_um)} μm / Strehl {fmtNum(row.strehl_550_edge)}
+                      {shim && <> · M2 垫片+BFL 最大 RMS {fmtNum(shim.max_rms_um)} μm / Strehl {fmtNum(shim.strehl_550_edge)}</>}
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="h-2 bg-slate-100 rounded overflow-hidden">
-                        <div
-                          className={`h-full ${row.strehlBfl < 0.8 ? 'bg-rose-600' : 'bg-amber-500'}`}
-                          style={{ width: `${Math.round(row.strehlBfl * 100)}%` }}
-                        />
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-600"
-                          style={{ width: `${Math.round(row.strehlShim * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
+                {!stage4 && <span className="text-xs text-slate-500">原始敏感度数据暂无可核验记录。</span>}
               </div>
-              <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-600 flex flex-wrap justify-between gap-2 font-mono tabular-nums">
-                <span>MC (40 trials · 仅 BFL): P50=5.125μm · 良率 75.0%</span>
-                <span className="font-semibold text-emerald-700">MC (M2 垫片+BFL): P50=3.842μm · 良率 100.0%</span>
+              <div className="pt-2 border-t border-slate-100 text-xs space-y-1">
+                <div>仅 BFL（{stage4Metrics?.mcBflOnlyTrials ?? '—'} 次） · P50 {fmtNum(stage4Metrics?.mcBflOnlyP50RmsUm)} μm · P95 {fmtNum(stage4Metrics?.mcBflOnlyP95RmsUm)} μm · RMS ≤ 7.5 μm 通过率 {fmtNum(stage4Metrics?.mcBflOnlyYield7_5Pct, 0)}%</div>
+                <div>M2 垫片+BFL（{stage4Metrics?.mcM2ShimTrials ?? '—'} 次） · P50 {fmtNum(stage4Metrics?.mcM2ShimP50RmsUm)} μm · P95 {fmtNum(stage4Metrics?.mcM2ShimP95RmsUm)} μm · RMS ≤ 7.5 μm 通过率 {fmtNum(stage4Metrics?.mcM2ShimYield7_5Pct, 0)}%</div>
+                {stage4Artifact && <a className="underline" href={'/api/fits/inspect-artifact?artifactId=' + stage4Artifact.id}>Stage 4 原始产物</a>}
               </div>
             </div>
           </div>

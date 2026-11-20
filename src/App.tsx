@@ -22,6 +22,10 @@ import { ResearchStudio, type DiscoveredPythonRuntime } from './components/Resea
 import { ArtifactsAndCompareView, type CompareSubTab } from './components/ArtifactsAndCompareView.tsx';
 import { ComponentLibrary } from './components/ComponentLibrary.tsx';
 import { ArchitectureMapView } from './components/ArchitectureMapView.tsx';
+import {
+  ResearchArtifacts, ResearchComponentContract, ResearchExecutionDialog, ResearchObservedMap,
+  ResearchRunControls, researchFetch, type ResearchState,
+} from './components/ResearchExecutionView.tsx';
 
 interface WorkbenchBootstrapPayload {
   studies: ResearchStudy[];
@@ -47,6 +51,33 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('experiment');
   const [compareSubTab, setCompareSubTab] = useState<CompareSubTab>('matrix');
   const [selectedFitsPath, setSelectedFitsPath] = useState<string | null>(null);
+  const [research, setResearch] = useState<ResearchState>({ artifacts: [], executions: [], recipeRuns: [] });
+  const [researchError, setResearchError] = useState('');
+  const [openExecutionId, setOpenExecutionId] = useState('');
+  const [researchArtifactId, setResearchArtifactId] = useState('');
+
+  const refreshResearch = useCallback(async () => {
+    try {
+      setResearch(await researchFetch<ResearchState>('/api/research/state'));
+      setResearchError('');
+    } catch (error) {
+      setResearchError(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
+
+  const researchRunning = research.recipeRuns.some((run) => run.status === 'running') ||
+    research.executions.some((run) => run.status === 'running');
+  useEffect(() => { void refreshResearch(); }, [refreshResearch, activeTab]);
+  useEffect(() => {
+    if (!researchRunning) return;
+    const timer = window.setInterval(() => { void refreshResearch(); }, 1600);
+    return () => window.clearInterval(timer);
+  }, [researchRunning, refreshResearch]);
+
+  const inspectResearchArtifact = (id: string) => {
+    setResearchArtifactId(id);
+    setActiveTab('compare');
+  };
 
   // V2 Study & Execution state
   const [studies, setStudies] = useState<ResearchStudy[]>([]);
@@ -488,6 +519,34 @@ export default function App() {
       />
 
       <main className="flex-1">
+        {researchError && <p role="alert" className="p-3 text-sm text-rose-700">科研执行 · {researchError}</p>}
+        {activeTab === 'experiment' && activeStudy && <ResearchRunControls
+          key={activeStudy.id}
+          studyId={activeStudy.id}
+          components={components}
+          state={research}
+          refresh={refreshResearch}
+          openExecution={setOpenExecutionId}
+          openComparison={() => setActiveTab('compare')}
+        />}
+        {activeTab === 'compare' && activeStudy && <ResearchArtifacts
+          key={activeStudy.id}
+          studyId={activeStudy.id}
+          state={research}
+          selectedId={researchArtifactId}
+          inspect={inspectResearchArtifact}
+          openExecution={setOpenExecutionId}
+        />}
+        {activeTab === 'components' && <ResearchComponentContract
+          dossier={components.find((item) => item.id === selectedComponentId)}
+          state={research}
+          openExecution={setOpenExecutionId}
+        />}
+        {activeTab === 'architecture' && <ResearchObservedMap
+          state={research}
+          openExecution={setOpenExecutionId}
+          inspect={inspectResearchArtifact}
+        />}
         {activeTab === 'experiment' && (
           <ResearchStudio
             studies={studies}
@@ -593,6 +652,14 @@ export default function App() {
           />
         )}
       </main>
+      {openExecutionId && <ResearchExecutionDialog
+        key={openExecutionId}
+        id={openExecutionId}
+        close={() => setOpenExecutionId('')}
+        inspect={inspectResearchArtifact}
+        openExecution={setOpenExecutionId}
+        refresh={refreshResearch}
+      />}
     </div>
   );
 }

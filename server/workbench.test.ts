@@ -14,6 +14,7 @@ import {
   listArchitectureAnnotations,
   listPersistedArchSnapshots,
   listWorkbenchData,
+  readArtifactJson,
   savePersistedArchSnapshot,
 } from './workbench.ts';
 import { buildDeterministicCollaboration } from './ai.ts';
@@ -43,6 +44,9 @@ test('workbench seeds WF-RC-1000 with authentic S0-S4 metrics, 20 FITS tiles, an
     const s3 = wb.branches.find((b) => b.id === 'branch-p2-s3');
     assert.ok(s3);
     assert.ok(Math.abs(Number(s3.metrics.maxRmsPolyUm) - 1.063) < 0.05);
+    assert.equal(s3.metrics.mcBflOnlyYield7_5Pct, 100);
+    assert.equal(s3.metrics.mcBflOnlyP50RmsUm, 3.781);
+    assert.equal(s3.metrics.mcM2ShimP95RmsUm, 3.086);
     assert.equal(wb.fitsCatalog.length, 20, 'Expected all 20 P2 FITS tiles in catalog');
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
@@ -173,10 +177,9 @@ test('python workbench runner executes real fits_batch_completeness on S3 4-tile
   const parsed = JSON.parse(resultLine.slice('RESULT_JSON:'.length));
   assert.equal(parsed.status, 'ok');
   assert.equal(parsed.tilesCount, 4);
-  assert.ok(
-    parsed.meanDaoMatchedToSepPct >= 70 && parsed.meanDaoMatchedToSepPct > parsed.meanStage3Dao3pxPct,
-    `Expected DAO(1.5px) match rate >= 70% and > Stage3 baseline (${parsed.meanStage3Dao3pxPct}%), got ${parsed.meanDaoMatchedToSepPct}%`,
-  );
+  assert.ok(parsed.meanDaoMatchedToSepPct >= 70);
+  assert.equal(parsed.meanDaoVsTruthRefPct, null);
+  assert.match(parsed.metricBasis, /SEP proxy/);
 });
 
 test('legacy workspace/runs.jsonl SHA-256 digest remains completely intact', () => {
@@ -226,3 +229,32 @@ test('ensureWorkbenchInitialized and listWorkbenchData never duplicate seeded no
   }
 });
 
+
+test('S2 projection corrects an existing stale summary and keeps the source ledger byte-identical', () => {
+  const ws = createTempWorkspace();
+  try {
+    ensureWorkbenchInitialized(ws);
+    const ledger = path.join(ws, 'workbench', 'branches.json');
+    const branches = JSON.parse(fs.readFileSync(ledger, 'utf8'));
+    const original = branches.find((branch: { id: string }) => branch.id === 'branch-p2-s2');
+    original.summary = '旧摘要：1.855–2.297 μm，Strehl 0.870–0.922，通过全部主要光学指标。';
+    original.metrics.strehlMid = 0.900;
+    fs.writeFileSync(ledger, JSON.stringify(branches));
+    const snapshot = fs.readFileSync(ledger);
+    const wb = listWorkbenchData(ws);
+    const s2 = wb.branches.find((branch) => branch.id === original.id)!;
+    assert.match(s2.summary, /2\.476–3\.221 μm/);
+    assert.match(s2.summary, /0\.77730–0\.86549/);
+    assert.match(s2.summary, /0\.25°、0\.42° 低于 0\.80/);
+    assert.equal(s2.metrics.strehlMid, 0.78747);
+    assert.equal(s2.metrics.strehl025, 0.77730);
+    assert.equal(wb.executions.find((run) => run.id === 'exec-p2-s2')?.outputs.strehl025, 0.77730);
+    assert.ok(s2.summaryArtifactId);
+    const source = wb.artifacts.find((artifact) => artifact.id === s2.summaryArtifactId);
+    assert.equal(source?.relativePath, 'experiments/p2_flagship/runs/branch_S2.json');
+    assert.equal(readArtifactJson(s2.summaryArtifactId, ws).branch_key, 'S2');
+    assert.deepEqual(fs.readFileSync(ledger), snapshot);
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});

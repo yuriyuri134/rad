@@ -103,9 +103,12 @@ export interface ComponentVersionRecord {
   codeHash: string; // Full 64-char SHA-256 hex digest
   params: Record<string, number | string | boolean>;
   codeFile: string;
+  approval?: CodeSecurityReviewState | null;
+  artifactContract?: import('./researchTypes.ts').ArtifactContract;
   lifecycle?: ComponentVersionLifecycle;
   frozenAt?: string | null;
   frozenByRunIds?: string[];
+  frozenByExecutionIds?: string[];
   frozenBySnapshotIds?: string[];
   sourceAvailability?: ComponentSourceAvailability;
   immutableBlobHash?: string | null;
@@ -716,6 +719,7 @@ export interface StudyBranch {
   status: 'baseline' | 'exploring' | 'adopted' | 'archived_blocked' | 'rejected';
   provenanceTier: ProvenanceTier;
   summary: string;
+  summaryArtifactId?: string;
   metrics: Record<string, number | string | boolean | null>;
   prescription?: Record<string, unknown>;
   artifactIds: string[];

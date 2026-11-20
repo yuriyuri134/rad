@@ -221,10 +221,14 @@ export function ComponentLibrary({
     if (!dossier) return;
     setErrorMsg(null);
     try {
+      const source = codeByVersion[version];
+      if (source === undefined) throw new Error('请先打开要审阅的版本源码');
+      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+      const expectedHash = Array.from(new Uint8Array(hash), (value) => value.toString(16).padStart(2, '0')).join('');
       const res = await fetch(`/api/components/${encodeURIComponent(dossier.id)}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version, reviewer: 'rad' }),
+        body: JSON.stringify({ version, reviewer: 'rad', expectedHash }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '确认哈希失败');
