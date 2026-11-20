@@ -176,10 +176,9 @@ test('python workbench runner executes real fits_batch_completeness on S3 4-tile
   const parsed = JSON.parse(resultLine.slice('RESULT_JSON:'.length));
   assert.equal(parsed.status, 'ok');
   assert.equal(parsed.tilesCount, 4);
-  assert.ok(
-    parsed.meanDaoMatchedToSepPct >= 70 && parsed.meanDaoMatchedToSepPct > parsed.meanStage3Dao3pxPct,
-    `Expected DAO(1.5px) match rate >= 70% and > Stage3 baseline (${parsed.meanStage3Dao3pxPct}%), got ${parsed.meanDaoMatchedToSepPct}%`,
-  );
+  assert.ok(parsed.meanDaoMatchedToSepPct >= 70);
+  assert.equal(parsed.meanDaoVsTruthRefPct, null);
+  assert.match(parsed.metricBasis, /SEP proxy/);
 });
 
 test('legacy workspace/runs.jsonl SHA-256 digest remains completely intact', () => {

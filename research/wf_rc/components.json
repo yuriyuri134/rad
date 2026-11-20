@@ -1,0 +1,1274 @@
+{
+  "version": "v1",
+  "prescriptionPort": {
+    "mediaType": "application/json",
+    "schemaId": "wf-rc/prescription-v1",
+    "jsonSchema": {
+      "type": "object",
+      "properties": {
+        "branch_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_]+$"
+        },
+        "d_m1_l1_mm": {
+          "type": "number"
+        },
+        "bfl_mm": {
+          "type": "number"
+        },
+        "k1": {
+          "type": "number"
+        },
+        "k2": {
+          "type": "number"
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "efl_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "efl_mm"
+          ]
+        },
+        "lenses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "r1_mm": {
+                "type": "number"
+              },
+              "r2_mm": {
+                "type": "number"
+              },
+              "tc_mm": {
+                "type": "number"
+              },
+              "material": {
+                "type": "string"
+              },
+              "gap_after_mm": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "r1_mm",
+              "r2_mm",
+              "tc_mm",
+              "material",
+              "gap_after_mm"
+            ]
+          }
+        }
+      },
+      "required": [
+        "branch_id",
+        "d_m1_l1_mm",
+        "bfl_mm",
+        "k1",
+        "k2",
+        "metrics",
+        "lenses"
+      ]
+    },
+    "description": "WF-RC 光学处方"
+  },
+  "prescriptions": {
+    "S1": {
+      "path": "experiments/p2_flagship/runs/branch_S1.json",
+      "sha256": "19509ee55c731817467f0c99c8d46587e1f137a32381c9daab1da99458849949"
+    },
+    "S2": {
+      "path": "experiments/p2_flagship/runs/branch_S2.json",
+      "sha256": "03984b94739c92a4ec468ee5109687aa971e5fa71d80fef035dad6aa28c83cef"
+    },
+    "S3": {
+      "path": "experiments/p2_flagship/runs/branch_S3.json",
+      "sha256": "05308d91bb5e01a2393f864e0b9f528ec8439b5cb5e01839b514ca75faa2a132"
+    },
+    "S4": {
+      "path": "experiments/p2_flagship/runs/branch_S4.json",
+      "sha256": "ffa69bd6a79e6825804845ed683517d61433d460bc9a9501dac92e3f38f8cf8e"
+    }
+  },
+  "components": [
+    {
+      "id": "wf-shared-sky",
+      "name": "生成共同星场",
+      "entry": {
+        "path": "research/wf_rc/sky.py",
+        "sha256": "009a89a78e3ae388cb2e3f7a64a4e656aa41576c2359dabb42d839b4310ceed5"
+      },
+      "local": [
+        {
+          "path": "experiments/p2_flagship/scripts/stage3_fits_astrometry_pipeline.py",
+          "sha256": "af0f8f89f4a1f1a3bf628bc2202d7f8c31259ebaa14caafeb20379a356b74ba8"
+        },
+        {
+          "path": "experiments/p2_flagship/scripts/wf_rc_models.py",
+          "sha256": "8baeeed8bf4157b8e9736be9cb211f7387d4d7142aa3d35b6d08f1880d4d4637"
+        }
+      ],
+      "contract": {
+        "protocol": "openlab-files/v1",
+        "inputs": {},
+        "outputs": {
+          "sky": {
+            "mediaType": "application/json",
+            "schemaId": "astro/shared-sky-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "field_deg": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.6
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "reference_efl_mm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stars": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "ra": {
+                        "type": "number"
+                      },
+                      "dec": {
+                        "type": "number"
+                      },
+                      "flux_e": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "ra",
+                      "dec",
+                      "flux_e"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "field_deg",
+                "seed",
+                "reference_efl_mm",
+                "stars"
+              ]
+            },
+            "description": "天球坐标和注入光子通量"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "field_deg": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.6,
+              "default": 0.6
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295,
+              "default": 642
+            },
+            "reference_efl_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 6000
+            }
+          },
+          "required": [
+            "field_deg",
+            "seed",
+            "reference_efl_mm"
+          ],
+          "additionalProperties": false
+        },
+        "timeoutMs": 45000,
+        "pythonPackages": {
+          "numpy": "2.5.5",
+          "scipy": "1.18.1",
+          "optiland": "0.6.3",
+          "astropy": "8.0.3",
+          "photutils": "3.1.1",
+          "sep": "1.4.1"
+        }
+      }
+    },
+    {
+      "id": "wf-exposure-render",
+      "name": "WF-RC 探测器模拟",
+      "entry": {
+        "path": "research/wf_rc/render.py",
+        "sha256": "3b0f7d6f7d525b3278d60882d649fb9b027f4a549e56cdc31b9e827019aff44a"
+      },
+      "local": [
+        {
+          "path": "experiments/p2_flagship/scripts/stage3_fits_astrometry_pipeline.py",
+          "sha256": "af0f8f89f4a1f1a3bf628bc2202d7f8c31259ebaa14caafeb20379a356b74ba8"
+        },
+        {
+          "path": "experiments/p2_flagship/scripts/wf_rc_models.py",
+          "sha256": "8baeeed8bf4157b8e9736be9cb211f7387d4d7142aa3d35b6d08f1880d4d4637"
+        }
+      ],
+      "contract": {
+        "protocol": "openlab-files/v1",
+        "inputs": {
+          "prescription": {
+            "mediaType": "application/json",
+            "schemaId": "wf-rc/prescription-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "branch_id": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_]+$"
+                },
+                "d_m1_l1_mm": {
+                  "type": "number"
+                },
+                "bfl_mm": {
+                  "type": "number"
+                },
+                "k1": {
+                  "type": "number"
+                },
+                "k2": {
+                  "type": "number"
+                },
+                "metrics": {
+                  "type": "object",
+                  "properties": {
+                    "efl_mm": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "efl_mm"
+                  ]
+                },
+                "lenses": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "r1_mm": {
+                        "type": "number"
+                      },
+                      "r2_mm": {
+                        "type": "number"
+                      },
+                      "tc_mm": {
+                        "type": "number"
+                      },
+                      "material": {
+                        "type": "string"
+                      },
+                      "gap_after_mm": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "r1_mm",
+                      "r2_mm",
+                      "tc_mm",
+                      "material",
+                      "gap_after_mm"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "branch_id",
+                "d_m1_l1_mm",
+                "bfl_mm",
+                "k1",
+                "k2",
+                "metrics",
+                "lenses"
+              ]
+            },
+            "description": "WF-RC 光学处方"
+          },
+          "sky": {
+            "mediaType": "application/json",
+            "schemaId": "astro/shared-sky-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "field_deg": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.6
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "reference_efl_mm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stars": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "ra": {
+                        "type": "number"
+                      },
+                      "dec": {
+                        "type": "number"
+                      },
+                      "flux_e": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "ra",
+                      "dec",
+                      "flux_e"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "field_deg",
+                "seed",
+                "reference_efl_mm",
+                "stars"
+              ]
+            },
+            "description": "天球坐标和注入光子通量"
+          }
+        },
+        "outputs": {
+          "fits": {
+            "mediaType": "application/fits",
+            "schemaId": "astro/optical-exposure-fits-v1",
+            "description": "完整浮点探测器曝光"
+          },
+          "truth": {
+            "mediaType": "application/json",
+            "schemaId": "astro/detector-truth-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "sky_artifact_id": {
+                  "type": "string"
+                },
+                "system": {
+                  "type": "string"
+                },
+                "field_deg": {
+                  "type": "number"
+                },
+                "pixel_scale_arcsec": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "eligibility": {
+                  "type": "object"
+                },
+                "stars": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "ra": {
+                        "type": "number"
+                      },
+                      "dec": {
+                        "type": "number"
+                      },
+                      "flux_e": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "x_opt": {
+                        "type": "number"
+                      },
+                      "y_opt": {
+                        "type": "number"
+                      },
+                      "rendered": {
+                        "type": "boolean"
+                      },
+                      "eligible": {
+                        "type": "boolean"
+                      },
+                      "retained_energy_fraction": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "ra",
+                      "dec",
+                      "flux_e",
+                      "x_opt",
+                      "y_opt",
+                      "rendered",
+                      "eligible",
+                      "retained_energy_fraction"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "sky_artifact_id",
+                "system",
+                "field_deg",
+                "pixel_scale_arcsec",
+                "eligibility",
+                "stars"
+              ]
+            },
+            "description": "逐星探测器真值、评价条件和能量保留"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "noise_seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295,
+              "default": 10600
+            }
+          },
+          "required": [
+            "noise_seed"
+          ],
+          "additionalProperties": false
+        },
+        "timeoutMs": 120000,
+        "pythonPackages": {
+          "numpy": "2.5.5",
+          "scipy": "1.18.1",
+          "optiland": "0.6.3",
+          "astropy": "8.0.3",
+          "photutils": "3.1.1",
+          "sep": "1.4.1"
+        }
+      }
+    },
+    {
+      "id": "wf-dao-extract",
+      "name": "DAOStarFinder 星表提取",
+      "entry": {
+        "path": "research/wf_rc/dao.py",
+        "sha256": "e90da90a92e128031634697975528aabdfc1f4e0f86965d515421f6c726af81a"
+      },
+      "local": [
+        {
+          "path": "research/wf_rc/catalog_io.py",
+          "sha256": "938990c320e1e31952ec551f8f1f077c0fdb47cf716813ffc0b62da9881e694d"
+        }
+      ],
+      "contract": {
+        "protocol": "openlab-files/v1",
+        "inputs": {
+          "fits": {
+            "mediaType": "application/fits",
+            "schemaId": "astro/optical-exposure-fits-v1",
+            "description": "完整浮点探测器曝光"
+          }
+        },
+        "outputs": {
+          "catalog": {
+            "mediaType": "application/json",
+            "schemaId": "astro/source-catalog-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "method": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "x_px": {
+                        "type": "number"
+                      },
+                      "y_px": {
+                        "type": "number"
+                      },
+                      "flux": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "x_px",
+                      "y_px",
+                      "flux"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "method",
+                "parameters",
+                "sources"
+              ]
+            },
+            "description": "逐源检测星表"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "fwhm_px": {
+              "type": "number",
+              "minimum": 0.7,
+              "maximum": 6,
+              "default": 1.5
+            },
+            "threshold_sigma": {
+              "type": "number",
+              "minimum": 1.5,
+              "maximum": 20,
+              "default": 4.5
+            }
+          },
+          "required": [
+            "fwhm_px",
+            "threshold_sigma"
+          ],
+          "additionalProperties": false
+        },
+        "timeoutMs": 45000,
+        "pythonPackages": {
+          "numpy": "2.5.5",
+          "astropy": "8.0.3",
+          "photutils": "3.1.1"
+        }
+      }
+    },
+    {
+      "id": "wf-sep-extract",
+      "name": "SEP 星表提取",
+      "entry": {
+        "path": "research/wf_rc/sep_extract.py",
+        "sha256": "6749f4e212ddb40c84764e67cd9c40f759244495e3275b37d12baa182506c942"
+      },
+      "local": [
+        {
+          "path": "research/wf_rc/catalog_io.py",
+          "sha256": "938990c320e1e31952ec551f8f1f077c0fdb47cf716813ffc0b62da9881e694d"
+        }
+      ],
+      "contract": {
+        "protocol": "openlab-files/v1",
+        "inputs": {
+          "fits": {
+            "mediaType": "application/fits",
+            "schemaId": "astro/optical-exposure-fits-v1",
+            "description": "完整浮点探测器曝光"
+          }
+        },
+        "outputs": {
+          "catalog": {
+            "mediaType": "application/json",
+            "schemaId": "astro/source-catalog-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "method": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "x_px": {
+                        "type": "number"
+                      },
+                      "y_px": {
+                        "type": "number"
+                      },
+                      "flux": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "x_px",
+                      "y_px",
+                      "flux"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "method",
+                "parameters",
+                "sources"
+              ]
+            },
+            "description": "逐源检测星表"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "threshold_sigma": {
+              "type": "number",
+              "minimum": 1.5,
+              "maximum": 20,
+              "default": 4.5
+            },
+            "minarea": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 20,
+              "default": 4
+            }
+          },
+          "required": [
+            "threshold_sigma",
+            "minarea"
+          ],
+          "additionalProperties": false
+        },
+        "timeoutMs": 45000,
+        "pythonPackages": {
+          "numpy": "2.5.5",
+          "astropy": "8.0.3",
+          "sep": "1.4.1"
+        }
+      }
+    },
+    {
+      "id": "wf-score",
+      "name": "独立逐星真值匹配",
+      "entry": {
+        "path": "research/wf_rc/score.py",
+        "sha256": "ad379a4f31236fc6459ac4730a488ed2f000d3b851ab9aa963d83342d602d3aa"
+      },
+      "local": [],
+      "contract": {
+        "protocol": "openlab-files/v1",
+        "inputs": {
+          "truth": {
+            "mediaType": "application/json",
+            "schemaId": "astro/detector-truth-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "sky_artifact_id": {
+                  "type": "string"
+                },
+                "system": {
+                  "type": "string"
+                },
+                "field_deg": {
+                  "type": "number"
+                },
+                "pixel_scale_arcsec": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "eligibility": {
+                  "type": "object"
+                },
+                "stars": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "ra": {
+                        "type": "number"
+                      },
+                      "dec": {
+                        "type": "number"
+                      },
+                      "flux_e": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "x_opt": {
+                        "type": "number"
+                      },
+                      "y_opt": {
+                        "type": "number"
+                      },
+                      "rendered": {
+                        "type": "boolean"
+                      },
+                      "eligible": {
+                        "type": "boolean"
+                      },
+                      "retained_energy_fraction": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "ra",
+                      "dec",
+                      "flux_e",
+                      "x_opt",
+                      "y_opt",
+                      "rendered",
+                      "eligible",
+                      "retained_energy_fraction"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "sky_artifact_id",
+                "system",
+                "field_deg",
+                "pixel_scale_arcsec",
+                "eligibility",
+                "stars"
+              ]
+            },
+            "description": "逐星探测器真值、评价条件和能量保留"
+          },
+          "catalog": {
+            "mediaType": "application/json",
+            "schemaId": "astro/source-catalog-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "method": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "x_px": {
+                        "type": "number"
+                      },
+                      "y_px": {
+                        "type": "number"
+                      },
+                      "flux": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "x_px",
+                      "y_px",
+                      "flux"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "method",
+                "parameters",
+                "sources"
+              ]
+            },
+            "description": "逐源检测星表"
+          }
+        },
+        "outputs": {
+          "evaluation": {
+            "mediaType": "application/json",
+            "schemaId": "astro/astrometry-evaluation-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "truth_id": {
+                  "type": "string"
+                },
+                "catalog_id": {
+                  "type": "string"
+                },
+                "radius_px": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "truth_total": {
+                  "type": "integer"
+                },
+                "truth_eligible": {
+                  "type": "integer"
+                },
+                "detected": {
+                  "type": "integer"
+                },
+                "matches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "truth_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "detection_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "distance_px": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "truth_id",
+                      "detection_id",
+                      "distance_px"
+                    ]
+                  }
+                },
+                "by_flux": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "radius_sensitivity": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "truth_id",
+                "catalog_id",
+                "radius_px",
+                "truth_total",
+                "truth_eligible",
+                "detected",
+                "matches",
+                "by_flux",
+                "radius_sensitivity"
+              ]
+            },
+            "description": "真值匹配与敏感性报告"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "radius_px": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10,
+              "default": 4
+            }
+          },
+          "required": [
+            "radius_px"
+          ],
+          "additionalProperties": false
+        },
+        "timeoutMs": 45000,
+        "pythonPackages": {
+          "numpy": "2.5.5",
+          "scipy": "1.18.1"
+        }
+      }
+    },
+    {
+      "id": "wf-compare",
+      "name": "同一曝光的三路评价对照",
+      "entry": {
+        "path": "research/wf_rc/compare.mjs",
+        "sha256": "6753c9ac85cf7434d4027730517d459d091676ac73f26b64afb44043454c2990"
+      },
+      "local": [],
+      "contract": {
+        "protocol": "openlab-files/v1",
+        "inputs": {
+          "dao30": {
+            "mediaType": "application/json",
+            "schemaId": "astro/astrometry-evaluation-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "truth_id": {
+                  "type": "string"
+                },
+                "catalog_id": {
+                  "type": "string"
+                },
+                "radius_px": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "truth_total": {
+                  "type": "integer"
+                },
+                "truth_eligible": {
+                  "type": "integer"
+                },
+                "detected": {
+                  "type": "integer"
+                },
+                "matches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "truth_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "detection_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "distance_px": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "truth_id",
+                      "detection_id",
+                      "distance_px"
+                    ]
+                  }
+                },
+                "by_flux": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "radius_sensitivity": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "truth_id",
+                "catalog_id",
+                "radius_px",
+                "truth_total",
+                "truth_eligible",
+                "detected",
+                "matches",
+                "by_flux",
+                "radius_sensitivity"
+              ]
+            },
+            "description": "真值匹配与敏感性报告"
+          },
+          "dao15": {
+            "mediaType": "application/json",
+            "schemaId": "astro/astrometry-evaluation-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "truth_id": {
+                  "type": "string"
+                },
+                "catalog_id": {
+                  "type": "string"
+                },
+                "radius_px": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "truth_total": {
+                  "type": "integer"
+                },
+                "truth_eligible": {
+                  "type": "integer"
+                },
+                "detected": {
+                  "type": "integer"
+                },
+                "matches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "truth_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "detection_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "distance_px": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "truth_id",
+                      "detection_id",
+                      "distance_px"
+                    ]
+                  }
+                },
+                "by_flux": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "radius_sensitivity": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "truth_id",
+                "catalog_id",
+                "radius_px",
+                "truth_total",
+                "truth_eligible",
+                "detected",
+                "matches",
+                "by_flux",
+                "radius_sensitivity"
+              ]
+            },
+            "description": "真值匹配与敏感性报告"
+          },
+          "sep": {
+            "mediaType": "application/json",
+            "schemaId": "astro/astrometry-evaluation-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "exposure_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "truth_id": {
+                  "type": "string"
+                },
+                "catalog_id": {
+                  "type": "string"
+                },
+                "radius_px": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "truth_total": {
+                  "type": "integer"
+                },
+                "truth_eligible": {
+                  "type": "integer"
+                },
+                "detected": {
+                  "type": "integer"
+                },
+                "matches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "truth_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "detection_id": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "distance_px": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "truth_id",
+                      "detection_id",
+                      "distance_px"
+                    ]
+                  }
+                },
+                "by_flux": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "radius_sensitivity": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "required": [
+                "exposure_sha256",
+                "truth_id",
+                "catalog_id",
+                "radius_px",
+                "truth_total",
+                "truth_eligible",
+                "detected",
+                "matches",
+                "by_flux",
+                "radius_sensitivity"
+              ]
+            },
+            "description": "真值匹配与敏感性报告"
+          }
+        },
+        "outputs": {
+          "comparison": {
+            "mediaType": "application/json",
+            "schemaId": "astro/astrometry-comparison-v1",
+            "jsonSchema": {
+              "type": "object",
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "method": {
+                        "type": "string"
+                      },
+                      "evaluation_id": {
+                        "type": "string"
+                      },
+                      "exposure_sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "field_deg": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "method",
+                      "evaluation_id",
+                      "exposure_sha256",
+                      "field_deg"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "rows"
+              ]
+            },
+            "description": "同一曝光三种提取配置的对比"
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "timeoutMs": 45000
+      }
+    }
+  ]
+}

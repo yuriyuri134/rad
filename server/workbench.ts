@@ -124,7 +124,7 @@ function readStage4Evidence(repoRoot: string) {
 const activeProcesses = new Map<string, ChildProcess>();
 const legacyP2Entry = 'python/workbench_p2_runner.py';
 const legacyP2SourceHashes = {
-  [legacyP2Entry]: 'e421ccf0be87e22a819cb647892a18f37cda431e5eddd9a0b86244da079ba34c',
+  [legacyP2Entry]: '38bf6aa0286ceac33c9c66467cec5df80413f2c30b690a8e3c4f52e92c6c4ce0',
   'experiments/p2_flagship/scripts/wf_rc_models.py': '8baeeed8bf4157b8e9736be9cb211f7387d4d7142aa3d35b6d08f1880d4d4637',
   'experiments/p2_flagship/scripts/stage4_tolerancing.py': 'c85f868be3f742f0567def4bb4a069b1aab76772db24428733a2e7f3672420eb',
   'experiments/p2_flagship/scripts/stage2_corrector_v2.py': '27ce811e53b1bfc81e65f9271dfc8521ac4feeb45f96cef46a40d4450f942e03',

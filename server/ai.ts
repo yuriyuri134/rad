@@ -176,7 +176,7 @@ export function buildDeterministicCollaboration(params: {
         content: [
           '【事实】单帧 S3 0.60° 验证后仍需检验在 S1–S4 不同像斑尺度 (1.06–9.70 μm) 下，下调 DAOStarFinder fwhmPx=1.5 px 是否在全视场均能对齐 SEP，且不引入噪声假阳性。',
           '【判断】仅看单一 0.60° 帧无法排除较小 fwhmPx 在模糊星斑 (S1/S4) 处分裂出多峰假阳性，必须对全部真实 FITS 瓦片执行跨系统批量横评。',
-          '【假设】在 S1–S4 共 16 帧瓦片上采用 fwhmPx=1.5 px, threshold=4.5σ，相对 SEP 交叉匹配率可由 Stage 3 均 ~56% 跃升至 90%+，且未匹配余项维持极低水平。',
+          '【假设】在 S1–S4 共 16 帧瓦片上采用 fwhmPx=1.5 px, threshold=4.5σ，采用同一组真值可测量下调核宽是否改善完备率。旧模式仅能观察与 SEP 的代理匹配，应保留 DAO 独有检出待核验。',
           '【提议】立即在工作台运行全视场 16 帧批量 Astropy/Photutils/SEP 交叉匹配实验。',
         ].join('\n'),
         evidenceRefs: ['experiments/p2_flagship/runs/stage3_fits_astrometry.json'],

@@ -7,6 +7,7 @@ import type { ArtifactContract, WorkflowRecipe } from '../src/core/researchTypes
 import { ResearchEngine } from './research_engine.ts';
 import { createNewComponent } from './workbench.ts';
 import { approveComponentVersion } from './storage.ts';
+import { runLocalProcess } from './process.ts';
 
 const readings = {
   schemaId: 'example/readings-v1', mediaType: 'application/json',
@@ -82,6 +83,18 @@ Path(m['manifestPath']).write_text(json.dumps({'outputs': {'report': 'comparison
     assert.equal(standalone.status, 'completed', standalone.error);
     assert.equal(standalone.rerunOf, compare.id);
     assert.throws(() => engine.rerunExecution(compare.id, { inputs: { readings: artifact.id, summary: artifact.id } }), /Schema/);
+    const badInput = path.join(ws, 'bad.json');
+    fs.writeFileSync(badInput, '{"mean":9}');
+    const mislabeled = await engine.store.importArtifact(badInput, {
+      schemaId: readings.schemaId, mediaType: readings.mediaType,
+    }, { studyId: 'example', importedFrom: 'unvalidated input' });
+    const schemaFailure = await engine.startExecution({
+      studyId: 'example', componentId: 'mean-reading', version: 'v0.1',
+      inputs: { readings: mislabeled.id }, parameters: {},
+    }).done;
+    assert.equal(schemaFailure.status, 'failed');
+    assert.match(schemaFailure.error ?? '', /JSON Schema/);
+    assert.deepEqual(schemaFailure.outputs, {});
     fs.writeFileSync(await engine.store.openArtifact(artifact), '[3,4,9]');
     const failure = await engine.rerunExecution(compare.id).done;
     assert.equal(failure.status, 'failed');
@@ -95,4 +108,16 @@ Path(m['manifestPath']).write_text(json.dumps({'outputs': {'report': 'comparison
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
+});
+
+test('timeouts and cancellation terminate a running child within the forced-exit budget', async () => {
+  const source = "process.on('SIGTERM', () => {}); setInterval(() => {}, 500); console.log('ready');";
+  const startedAt = Date.now();
+  await assert.rejects(runLocalProcess(process.execPath, ['-e', source], '', 350), /时间预算/);
+  assert.ok(Date.now() - startedAt < 5500);
+  const controller = new AbortController();
+  await assert.rejects(runLocalProcess(process.execPath, ['-e', source], '', 6000, process.env, {
+    signal: controller.signal,
+    log: (chunk) => { if (chunk.toString().includes('ready')) controller.abort(); },
+  }), /已取消/);
 });

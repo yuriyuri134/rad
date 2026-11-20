@@ -51,6 +51,8 @@ def get_package_versions() -> dict[str, str | None]:
 
 def load_p2_branch_prescription(branch_key: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     key = branch_key.strip().upper()
+    if key not in {"S1", "S2", "S3", "S4"}:
+        raise ValueError("Expected an existing S1-S4 prescription")
     branch_file = P2_RUNS_DIR / f"branch_{key}.json"
     if branch_file.exists():
         with branch_file.open("r", encoding="utf-8") as fh:
@@ -59,10 +61,7 @@ def load_p2_branch_prescription(branch_key: str) -> tuple[dict[str, Any], list[d
         v2_file = P2_RUNS_DIR / "S1_to_S4_correctors_v2.json"
         with v2_file.open("r", encoding="utf-8") as fh:
             all_v2 = json.load(fh)
-        matched = next(
-            (b for b in all_v2.get("branches", []) if b.get("branch_key") == key),
-            None,
-        )
+        matched = all_v2.get(key)
         if not matched:
             raise FileNotFoundError(f"未找到 P2 光学分支处方 {branch_key}")
         data = matched
@@ -512,8 +511,6 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
         ref_tile = stage3_ref_by_file.get(abs_path.name, {})
         ref_phot = ref_tile.get("photutils", {})
         ref_sep = ref_tile.get("sep", {})
-        n_truth = int(ref_sep.get("n_truth") or ref_phot.get("n_truth") or 28)
-        dao_vs_truth_pct = round(100.0 * min(matched_count, n_truth) / max(1, n_truth), 1)
 
         tile_results.append(
             {
@@ -527,7 +524,7 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
                 "sepCount": sep_count,
                 "daoMatchedToSep": matched_count,
                 "daoVsSepMatchPct": match_vs_sep_pct,
-                "daoVsTruthRefPct": dao_vs_truth_pct,
+                "daoVsTruthRefPct": None,
                 "daoUnmatchedExcess": unmatched_excess,
                 "daoMedianFwhmPx": med_fwhm_px,
                 "daoMedianFwhmArcsec": med_fwhm_as,
@@ -541,7 +538,6 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
 
     mean_match_sep = round(sum(t["daoVsSepMatchPct"] for t in tile_results) / len(tile_results), 1)
     min_match_sep = round(min(t["daoVsSepMatchPct"] for t in tile_results), 1)
-    mean_dao_vs_truth = round(sum(t["daoVsTruthRefPct"] for t in tile_results) / len(tile_results), 1)
     total_excess = sum(t["daoUnmatchedExcess"] for t in tile_results)
     stage3_dao_vals = [float(t["stage3Dao3pxCompletenessPct"]) for t in tile_results if t["stage3Dao3pxCompletenessPct"] is not None]
     mean_stage3_dao = round(sum(stage3_dao_vals) / len(stage3_dao_vals), 1) if stage3_dao_vals else None
@@ -567,7 +563,8 @@ def run_fits_batch_completeness(params: dict[str, Any]) -> dict[str, Any]:
         "tilesCount": len(tile_results),
         "meanDaoMatchedToSepPct": mean_match_sep,
         "minDaoMatchedToSepPct": min_match_sep,
-        "meanDaoVsTruthRefPct": mean_dao_vs_truth,
+        "meanDaoVsTruthRefPct": None,
+        "metricBasis": "SEP proxy cross-match; independent per-star truth unavailable",
         "totalDaoUnmatchedExcess": total_excess,
         "meanStage3Dao3pxPct": mean_stage3_dao,
         "meanStage3SepPct": mean_stage3_sep,

@@ -55,7 +55,7 @@ export function stageVerifiedSources(entry: string, sources: Record<string, Veri
 export function stageVerifiedPython(entry: string, sources: Record<string, VerifiedSource>) {
   const stage = stageVerifiedSources(entry, sources);
   const args = [
-    '-I', '-B', '-u', '-c',
+    '-I', '-X', 'utf8', '-B', '-u', '-c',
     'import os, runpy, sys; entry = sys.argv.pop(1); sys.argv[0] = entry; sys.path.insert(0, os.path.dirname(entry)); runpy.run_path(entry, run_name="__main__")',
     stage.entry,
   ];

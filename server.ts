@@ -75,6 +75,7 @@ import {
 import { ResearchEngine } from './server/research_engine.ts';
 import { installResearchRoutes } from './server/research_routes.ts';
 import { validateContract } from './server/research_store.ts';
+import { installWfRcComponents } from './server/wf_rc.ts';
 import type { ArtifactContract } from './src/core/researchTypes.ts';
 
 async function startServer() {
@@ -97,6 +98,7 @@ async function startServer() {
     next();
   });
   app.use(express.json({ limit: '15mb' }));
+  installWfRcComponents();
   const research = new ResearchEngine();
   research.store.recoverInterrupted();
   installResearchRoutes(app, research);

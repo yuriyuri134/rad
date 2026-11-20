@@ -6,6 +6,7 @@ import { parseFitsBuffer } from '../src/core/fits.ts';
 import { ResearchEngine } from './research_engine.ts';
 import { checkId, validateContract } from './research_store.ts';
 import { listWorkbenchData } from './workbench.ts';
+import { buildWfRcRecipe } from './wf_rc.ts';
 
 export function installResearchRoutes(app: Express, engine: ResearchEngine) {
   function action(handler: (req: Request, res: Response) => unknown) {
@@ -65,6 +66,12 @@ export function installResearchRoutes(app: Express, engine: ResearchEngine) {
       ...(inputs === undefined ? {} : { inputs }),
       ...(parameters === undefined ? {} : { parameters }),
     });
+    track(job.done);
+    res.status(202).json(job.record);
+  }));
+  app.post('/api/research/wf-rc-1000', action(async (req, res) => {
+    const recipe = await buildWfRcRecipe(engine.store, req.body ?? {});
+    const job = engine.startRecipe(recipe);
     track(job.done);
     res.status(202).json(job.record);
   }));

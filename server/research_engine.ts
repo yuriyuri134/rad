@@ -40,7 +40,10 @@ export class ResearchEngine {
   readonly store: ResearchStore;
   private active = new Map<string, AbortController>();
 
-  constructor(private workspaceDir?: string) {
+  private readonly workspaceDir?: string;
+
+  constructor(workspaceDir?: string) {
+    this.workspaceDir = workspaceDir;
     this.store = new ResearchStore(workspaceDir);
   }
 
