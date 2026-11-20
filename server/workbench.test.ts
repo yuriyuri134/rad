@@ -144,9 +144,14 @@ test('AI deterministic collaborator proposes fits_batch_completeness and wf_rc_s
   }
 });
 
-test('python workbench runner executes real fits_batch_completeness on S3 4-tile FITS frames when /tmp/p2_venv exists', () => {
-  const pyExe = '/tmp/p2_venv/bin/python';
-  if (!fs.existsSync(pyExe)) return;
+test('python workbench runner executes real fits_batch_completeness on S3 4-tile FITS frames when scientific venv exists', () => {
+  const candidates = [
+    process.env.OPENLAB_PYTHON_BIN?.trim(),
+    path.resolve(process.cwd(), '.venv', 'bin', 'python'),
+    '/tmp/p2_venv/bin/python',
+  ].filter((p): p is string => Boolean(p));
+  const pyExe = candidates.find((p) => fs.existsSync(p));
+  if (!pyExe) return;
   const out = execFileSync(
     pyExe,
     ['-u', 'python/workbench_p2_runner.py', '--mode', 'fits_batch_completeness'],

@@ -113,6 +113,36 @@ function safeReadRepoJson<T>(repoRoot: string, relPath: string): { data: T; sha2
   }
 }
 
+const activeProcesses = new Map<string, ChildProcess>();
+
+export function reconcileOrphanedAsyncJobs(workspaceDir?: string): void {
+  const paths = getWorkbenchPaths(workspaceDir);
+  if (!fs.existsSync(paths.jobsFile)) return;
+  const jobs = readJsonFile<AsyncJobRecord[]>(paths.jobsFile, []);
+  let changed = false;
+  const now = new Date().toISOString();
+  const updated = jobs.map((j) => {
+    if ((j.status === 'running' || j.status === 'queued') && !activeProcesses.has(j.id)) {
+      changed = true;
+      return {
+        ...j,
+        status: 'failed' as const,
+        errorMessage:
+          '宿主容器或服务进程在任务完成落盘前发生重启/快照回滚，原始子进程已中断（保留启动依据，未伪造完成产物；可从研究记录账本重新启动实算）',
+        logs: [
+          ...j.logs,
+          `[${now}] [recovery] 检测到服务重启或容器快照回滚后子进程已不存在 (${j.id})，已如实标记为中断 (failed)，不伪造完成产物。`,
+        ],
+        finishedAt: j.finishedAt ?? now,
+      };
+    }
+    return j;
+  });
+  if (changed) {
+    atomicWriteFileSync(paths.jobsFile, JSON.stringify(updated, null, 2));
+  }
+}
+
 /**
  * Deterministically and idempotently seeds WF-RC-1000 from authentic P2 flagship artifacts
  * inside workspace/workbench/ without touching legacy runs.jsonl or Stage A1 files.
@@ -122,6 +152,8 @@ export function ensureWorkbenchInitialized(workspaceDir?: string): void {
   fs.mkdirSync(paths.wbDir, { recursive: true });
   fs.mkdirSync(paths.logsDir, { recursive: true });
   fs.mkdirSync(paths.generatedArtifactsDir, { recursive: true });
+
+  reconcileOrphanedAsyncJobs(workspaceDir);
 
   const existingStudies = readJsonFile<ResearchStudy[]>(paths.studiesFile, []);
   if (existingStudies.some((s) => s.id === 'study-wf-rc-1000')) {
@@ -1091,8 +1123,6 @@ export function appendEpistemicNote(
 // ============================================================================
 // Controlled Async Subprocess Runner (Unbuffered Logs, Timeout Budget, Cancel)
 // ============================================================================
-
-const activeProcesses = new Map<string, ChildProcess>();
 
 function persistJobsList(jobs: AsyncJobRecord[], workspaceDir?: string): void {
   const paths = getWorkbenchPaths(workspaceDir);
