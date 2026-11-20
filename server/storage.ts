@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { traceOpticalSystem } from '../src/core/optics.ts';
+import type { ExecutionRecord } from '../src/core/researchTypes.ts';
+import type { VerifiedSource } from './process.ts';
 import type {
   ActorAttribution,
   ArchitectureSnapshot,
@@ -39,6 +41,10 @@ export function resolveWorkspaceDir(workspaceDir?: string): string {
     return path.resolve(process.env.OPENLAB_WORKSPACE_DIR);
   }
   return path.resolve(process.cwd(), 'workspace');
+}
+
+export function resolveResearchStoreDir(workspaceDir?: string): string {
+  return path.join(resolveWorkspaceDir(workspaceDir), 'workbench', 'research');
 }
 
 export function getWorkspacePaths(workspaceDir?: string) {
@@ -1925,8 +1931,20 @@ export function forkComponentVersion(
   }
 
   const verDir = path.join(componentsDir, path.basename(dossier.id), safeNewVersion);
+  const researchDeps = baseRecord.frozenByExecutionIds?.length ? baseRecord.pinnedRelativeDeps ?? [] : [];
+  const dependencies = researchDeps.map((dep) => {
+    const target = path.resolve(verDir, dep.relativePath);
+    const relative = path.relative(verDir, target);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error('派生版本的相对依赖越界：' + dep.relativePath);
+    }
+    const content = readCasBlob(dep.codeHash, workspaceDir);
+    if (content === null) throw new Error('派生版本缺少已冻结依赖：' + dep.relativePath);
+    return { target, content };
+  });
   fs.mkdirSync(verDir, { recursive: true });
   atomicWriteFileSync(path.join(verDir, baseRecord.codeFile), params.codeContent);
+  for (const dep of dependencies) atomicWriteFileSync(dep.target, dep.content);
 
   const newHash = sha256(params.codeContent);
   const newRecord: ComponentVersionRecord = {
@@ -1969,6 +1987,18 @@ export function forkComponentVersion(
   return getComponent(dossier.id, workspaceDir)!.dossier;
 }
 
+// A pre-M1.1 execution can refer to a Draft whose original version has drifted.
+function existingResearchExecutions(componentId: string, version: string, workspaceDir?: string): string[] {
+  const records = path.join(resolveResearchStoreDir(workspaceDir), 'records');
+  if (!fs.existsSync(records)) return [];
+  return fs.readdirSync(records)
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => JSON.parse(fs.readFileSync(path.join(records, name), 'utf8')) as ExecutionRecord)
+    .filter((record) => record.status === 'completed' &&
+      record.component.componentId === componentId && record.component.version === version)
+    .map((record) => record.id);
+}
+
 /**
  * Only Draft versions that are NOT referenced by any Snapshot or ExperimentRun
  * and whose source exists on disk may be edited in place.
@@ -1996,9 +2026,10 @@ export function saveComponentDraft(
     listRawRuns(workspaceDir),
     listSnapshots(workspaceDir),
   );
-  if (ver.lifecycle === 'frozen' || refs.runIds.length > 0 || refs.snapshotIds.length > 0) {
+  const researchIds = ver.frozenByExecutionIds ?? existingResearchExecutions(dossier.id, ver.version, workspaceDir);
+  if (ver.lifecycle === 'frozen' || refs.runIds.length > 0 || refs.snapshotIds.length > 0 || researchIds.length > 0) {
     throw new Error(
-      `不可变版本保护：${dossier.id}@${ver.version} 已被实验或快照冻结（runs=[${refs.runIds.join(',')}], snapshots=[${refs.snapshotIds.join(',')}]），禁止直接覆盖，请创建新的 Draft 或派生版本。`,
+      `不可变版本保护：${dossier.id}@${ver.version} 已被实验或快照冻结（runs=[${refs.runIds.join(',')}], snapshots=[${refs.snapshotIds.join(',')}], executions=[${researchIds.join(',')}]），禁止直接覆盖，请创建新的 Draft 或派生版本。`,
     );
   }
 
@@ -2050,7 +2081,11 @@ export function saveComponentDraft(
 export function freezeComponentVersion(
   componentId: string,
   version: string,
-  ref: { runId?: string; snapshotId?: string },
+  ref: {
+    runId?: string;
+    snapshotId?: string;
+    research?: { executionIds: string[]; sources: Record<string, VerifiedSource> };
+  },
   workspaceDir?: string,
 ): ComponentDossier {
   const rawDossier = getRawDossier(componentId, workspaceDir);
@@ -2063,7 +2098,31 @@ export function freezeComponentVersion(
   const codePath = path.join(versionDir, ver.codeFile);
   const existsOnDisk = fs.existsSync(codePath);
 
-  if (!ver.immutableBlobHash && existsOnDisk) {
+  if (ref.research) {
+    const { sources } = ref.research;
+    const main = sources[ver.codeFile];
+    if (main?.codeHash !== ver.codeHash ||
+        (ver.immutableBlobHash && ver.immutableBlobHash !== main.codeHash) ||
+        Object.values(sources).some(({ code, codeHash }) => sha256(code) !== codeHash)) {
+      throw new Error('冻结失败，执行源码与版本哈希不一致');
+    }
+    const dependencies = Object.entries(sources).filter(([name]) => name !== ver.codeFile);
+    for (const dependency of ver.pinnedRelativeDeps ?? []) {
+      if (sources[dependency.relativePath]?.codeHash !== dependency.codeHash ||
+          (dependency.immutableBlobHash && dependency.immutableBlobHash !== dependency.codeHash)) {
+        throw new Error('冻结失败，执行依赖与版本哈希不一致: ' + dependency.relativePath);
+      }
+    }
+    ver.immutableBlobHash = writeCasBlob(main.code, workspaceDir);
+    ver.pinnedRelativeDeps = dependencies.map(([relativePath, source]) => ({
+      relativePath,
+      codeHash: source.codeHash,
+      immutableBlobHash: writeCasBlob(source.code, workspaceDir),
+    })).sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+    ver.frozenByExecutionIds = Array.from(new Set([
+      ...(ver.frozenByExecutionIds ?? []), ...ref.research.executionIds,
+    ]));
+  } else if (!ver.immutableBlobHash && existsOnDisk) {
     const diskContent = fs.readFileSync(codePath, 'utf8');
     if (sha256(diskContent) === ver.codeHash) {
       ver.immutableBlobHash = writeCasBlob(diskContent, workspaceDir);
@@ -2072,7 +2131,7 @@ export function freezeComponentVersion(
     readCasBlob(ver.immutableBlobHash, workspaceDir);
   }
 
-  if (existsOnDisk && ver.immutableBlobHash) {
+  if (!ref.research && existsOnDisk && ver.immutableBlobHash) {
     const discovered = discoverLocalRelativeDependencies(versionDir, ver.codeFile, rawDossier.dependencies);
     if (ver.pinnedRelativeDeps && ver.pinnedRelativeDeps.length > 0) {
       ver.pinnedRelativeDeps = ver.pinnedRelativeDeps.map((dep) => {
@@ -2366,6 +2425,10 @@ export function approveComponentVersion(
   if (!fs.existsSync(codePath)) {
     throw new Error(`组件 ${componentId}@${version} 源码文件在磁盘缺失，无法核准授权`);
   }
+  if (ver.lifecycle !== 'frozen' && existingResearchExecutions(componentId, version, workspaceDir).length) {
+    throw new Error('不可变版本保护：该版本已有科研执行记录，请从该版本派生新版本。');
+  }
+
   const actualDiskText = fs.readFileSync(codePath, 'utf8');
   const actualDiskHash = sha256(actualDiskText);
   if (expectedHash !== undefined && expectedHash !== actualDiskHash) {

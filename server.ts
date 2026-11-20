@@ -100,7 +100,7 @@ async function startServer() {
   app.use(express.json({ limit: '15mb' }));
   installWfRcComponents();
   const research = new ResearchEngine();
-  research.store.recoverInterrupted();
+  research.recoverInterrupted();
   installResearchRoutes(app, research);
 
   app.get('/api/environment', async (_req, res) => {

@@ -21,7 +21,7 @@ import type {
   WorkflowExecution,
 } from '../src/core/types.ts';
 import { inspectDiscoveredPythonRuntime } from './python_env.ts';
-import { projectScienceCorrections, stage4Metrics, fitsProxyCaveat, type Stage4 } from './science_evidence.ts';
+import { projectScienceCorrections, stage4Metrics, fitsProxyCaveat, s2ScienceSummary, s2SummaryArtifactId, type S2Prescription, type Stage4 } from './science_evidence.ts';
 import { pythonEnvironment, readVerifiedSource, stageVerifiedPython, stopChild } from './process.ts';
 import {
   atomicWriteFileSync,
@@ -113,6 +113,12 @@ function safeReadRepoJson<T>(repoRoot: string, relPath: string): { data: T; sha2
   } catch {
     return null;
   }
+}
+
+const s2Path = 'experiments/p2_flagship/runs/branch_S2.json';
+function readS2Evidence(repoRoot: string) {
+  const result = safeReadRepoJson<S2Prescription>(repoRoot, s2Path);
+  return result?.sha256 === '03984b94739c92a4ec468ee5109687aa971e5fa71d80fef035dad6aa28c83cef' ? result : null;
 }
 
 const stage4Path = 'experiments/p2_flagship/runs/stage4_tolerancing.json';
@@ -295,7 +301,7 @@ export function ensureWorkbenchInitialized(workspaceDir?: string): void {
       name: 'S2 三片 Wynne 全熔石英校正镜 (锁定 RC 圆锥系数)',
       hypothesis: '固定主次镜纯 RC K1/K2，引入经典三片式 Wynne 校正组，验证全视场衍射性能。',
       status: 'exploring',
-      summary: '全视场 RMS 压至 1.855–2.297 μm，0.0°–0.60° 550nm Strehl 达到 0.870–0.922，通过全部主要光学指标，是纯 RC 镜面约束下最优构型。',
+      summary: s2ScienceSummary(readS2Evidence(repoRoot)?.data).summary,
       stage3SysKey: 'S2_3Lens_Wynne_FS_RC',
     },
     {
@@ -889,13 +895,21 @@ export function listWorkbenchData(workspaceDir?: string) {
   const studies = dedupeById([...wbStudies, ...(p1.study ? [p1.study] : [])]);
   const branches = dedupeById([...wbBranches, ...p1.branches]);
   const executions = dedupeById([...wbExecutions, ...p1.executions]);
-  const artifacts = dedupeById(wbArtifacts);
+  const s2 = readS2Evidence(resolveRepoRoot());
+  const s2Branch = branches.find((branch) => branch.id === 'branch-p2-s2');
+  const s2Artifact: ArtifactRef | null = s2 && s2Branch ? {
+    id: s2SummaryArtifactId, studyId: s2Branch.studyId, branchId: s2Branch.id, executionId: 'exec-p2-s2',
+    kind: 'optical_prescription_json', title: 'S2 原始处方及逐视场指标',
+    relativePath: s2Path, sha256: s2.sha256, byteLength: s2.bytes,
+    provenanceTier: 'external_verified_import', createdAt: s2Branch.createdAt,
+  } : null;
+  const artifacts = dedupeById([...(s2Artifact ? [s2Artifact] : []), ...wbArtifacts]);
   const notes = dedupeById([...wbNotes, ...p1.notes]);
   const fitsCatalog = listFitsCatalog();
   const pythonRuntime = inspectDiscoveredPythonRuntime();
 
   return {
-    ...projectScienceCorrections(studies, branches, executions, notes, readStage4Evidence(resolveRepoRoot())?.data),
+    ...projectScienceCorrections(studies, branches, executions, notes, readStage4Evidence(resolveRepoRoot())?.data, s2?.data),
     artifacts,
     jobs,
     fitsCatalog,
@@ -1805,6 +1819,11 @@ export function readArtifactJson(artifactId: string, workspaceDir?: string): Rec
   ensureWorkbenchInitialized(workspaceDir);
   const paths = getWorkbenchPaths(workspaceDir);
   const artifacts = readJsonlFile<ArtifactRef>(paths.artifactsFile);
+  if (artifactId === s2SummaryArtifactId) {
+    const evidence = readS2Evidence(resolveRepoRoot());
+    if (!evidence) throw new Error('S2 原始产物不存在或 SHA-256 不匹配');
+    return evidence.data;
+  }
   const art = artifacts.find((a) => a.id === artifactId);
   if (!art) {
     throw new Error(`未找到产物记录 ${artifactId}`);

@@ -267,7 +267,8 @@ export function ArtifactsAndCompareView({
                           <div className="font-semibold text-slate-900">
                             {b.shortCode} · {b.name}
                           </div>
-                          <div className="text-[11px] text-slate-500 max-w-xs truncate">{b.summary}</div>
+                          <div className={b.summaryArtifactId ? 'text-[11px] text-slate-600 max-w-xs' : 'text-[11px] text-slate-500 max-w-xs truncate'}>{b.summary}</div>
+                          {b.summaryArtifactId && <a className="text-[11px] underline" href={'/api/fits/inspect-artifact?artifactId=' + encodeURIComponent(b.summaryArtifactId)}>原始处方与指标</a>}
                         </td>
                         <td className="px-3 py-2.5 font-sans whitespace-nowrap">
                           <span className={`inline-block px-1.5 py-0.5 text-[11px] border rounded-sm ${prov.cls}`}>

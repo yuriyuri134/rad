@@ -9,7 +9,7 @@ import type {
 import { resolveAndAssertApproved, type ApprovedComponentExecutionContext } from './runner.ts';
 import { pythonEnvironment, runLocalProcess, stageVerifiedPython, stageVerifiedSources } from './process.ts';
 import { checkId, controlledFile, isRecord, ResearchStore, sameKeys, validateContract, validateSchema } from './research_store.ts';
-import { canonicalJson } from './storage.ts';
+import { canonicalJson, freezeComponentVersion } from './storage.ts';
 import { resolvePythonBinary } from './python_env.ts';
 
 function errorMessage(error: unknown) {
@@ -30,6 +30,22 @@ function environment(ctx: ApprovedComponentExecutionContext, contract: ArtifactC
     if (installed !== required) throw new Error(name + ' 需要版本 ' + required + '，当前为 ' + (installed ?? '未安装'));
   }
   return { runtime: 'python', executable, ...details };
+}
+
+function componentFiles(ctx: ApprovedComponentExecutionContext, contract: ArtifactContract) {
+  const entry = path.basename(ctx.ver.codeFile);
+  const sources = { ...ctx.verifiedRelativeDeps, [entry]: { code: ctx.verifiedCode, codeHash: ctx.verifiedHash } };
+  return {
+    entry, sources,
+    component: {
+      componentId: ctx.dossier.id, version: ctx.ver.version, contract, codeHash: ctx.verifiedHash,
+      sources: Object.fromEntries(Object.entries(sources).map(([name, value]) => [name, value.codeHash])),
+    },
+  };
+}
+
+function matchesComponent(record: ExecutionRecord, component: ExecutionRecord['component'], runtime: ExecutionRecord['environment']['runtime']) {
+  return record.environment.runtime === runtime && canonicalJson(record.component) === canonicalJson(component);
 }
 
 function compatible(output: Pick<ArtifactRecord, 'schemaId' | 'mediaType'>, input: typeof output): boolean {
@@ -65,17 +81,35 @@ export class ResearchEngine {
     return { ctx, contract };
   }
 
-  startExecution(request: ExecutionRequest, options: { rerunOf?: string; recipeRunId?: string; recipeStepId?: string } = {}) {
+  private planExecution(request: ExecutionRequest) {
     const { ctx, contract } = this.prepare(request);
-    const catalog = new Map(this.store.listArtifacts().map((artifact) => [artifact.id, artifact]));
+    const files = componentFiles(ctx, contract);
+    const runtime = ctx.dossier.runtime === 'local_process_py' ? 'python' : 'node';
+    const executions = this.store.listExecutions();
+    const conflict = executions.some((record) => record.status === 'completed' &&
+      record.component.componentId === request.componentId && record.component.version === request.version &&
+      !matchesComponent(record, files.component, runtime));
+    if (conflict) throw new Error('科研执行历史与组件版本的代码、依赖或契约不一致。请派生并批准新版本。');
+    const catalog = new Map(this.store.listArtifacts(executions).map((artifact) => [artifact.id, artifact]));
     const inputs = Object.fromEntries(Object.entries(contract.inputs).map(([port, want]) => {
       const artifact = catalog.get(request.inputs[port]);
       if (!artifact) throw new Error('缺少输入产物 ' + port);
       if (!compatible(artifact, want)) throw new Error('输入产物类型或 Schema 不匹配: ' + port);
       return [port, artifact];
     }));
-    const entry = path.basename(ctx.ver.codeFile);
-    const sources = { ...ctx.verifiedRelativeDeps, [entry]: { code: ctx.verifiedCode, codeHash: ctx.verifiedHash } };
+    return { ...files, inputs, environment: environment(ctx, contract) };
+  }
+
+  startExecution(request: ExecutionRequest, options: { rerunOf?: string; recipeRunId?: string; recipeStepId?: string } = {}) {
+    return this.startPreparedExecution(request, this.planExecution(request), options);
+  }
+
+  private startPreparedExecution(
+    request: ExecutionRequest,
+    plan: ReturnType<ResearchEngine['planExecution']>,
+    options: { rerunOf?: string; recipeRunId?: string; recipeStepId?: string },
+  ) {
+    const { entry, sources, inputs, component, environment } = plan;
     const record: ExecutionRecord = {
       id: 'execution-' + randomUUID(),
       request,
@@ -84,16 +118,12 @@ export class ResearchEngine {
       ...options,
       inputs,
       outputs: {},
-      component: {
-        componentId: request.componentId, version: request.version,
-        contract, codeHash: ctx.verifiedHash,
-        sources: Object.fromEntries(Object.entries(sources).map(([name, value]) => [name, value.codeHash])),
-      },
-      environment: environment(ctx, contract),
+      component,
+      environment,
     };
     if (options.rerunOf) {
       const original = this.store.getExecution(options.rerunOf);
-      if (!original || canonicalJson(original.component) !== canonicalJson(record.component)) {
+      if (!original || !matchesComponent(original, component, environment.runtime)) {
         throw new Error('原执行的组件版本或契约已经改变。请显式选择已审批版本发起新执行。');
       }
     }
@@ -132,6 +162,16 @@ export class ResearchEngine {
         const saved = await this.store.archiveFile(controlledFile(stage.directory, relative));
         if (saved.sha256 !== hash) throw new Error('执行源码归档哈希不匹配');
       }
+      if (signal.aborted) throw new Error('执行已取消');
+      // Verify again after staging, then freeze these exact bytes before the child can run.
+      const current = this.prepare(record.request);
+      const runtime = current.ctx.dossier.runtime === 'local_process_py' ? 'python' : 'node';
+      if (!matchesComponent(record, componentFiles(current.ctx, current.contract).component, runtime)) {
+        throw new Error('组件在准备期间发生变化，请重新发起执行');
+      }
+      freezeComponentVersion(record.request.componentId, record.request.version, {
+        research: { executionIds: [record.id], sources },
+      }, this.workspaceDir);
       const manifestPath = path.join(outputDir, 'result.json');
       const payload = JSON.stringify({ protocol: 'openlab-files/v1', inputs, outputDir, manifestPath, parameters: record.request.parameters });
       const result = await runLocalProcess(
@@ -171,6 +211,42 @@ export class ResearchEngine {
     }
     this.store.saveExecution(outcome);
     return outcome;
+  }
+
+  recoverInterrupted() {
+    this.store.recoverInterrupted();
+    const versions = new Map<string, ExecutionRecord[]>();
+    for (const record of this.store.listExecutions()) {
+      if (record.status !== 'completed') continue;
+      const { componentId, version } = record.component;
+      const key = componentId + '@' + version;
+      const group = versions.get(key) ?? [];
+      group.push(record);
+      versions.set(key, group);
+    }
+    // M1 already archived source fingerprints. Promote compatible historical versions
+    // through the ordinary CAS path, without rewriting any historical execution.
+    for (const [key, records] of versions) {
+      const { componentId, version } = records[0].component;
+      try {
+        const ctx = resolveAndAssertApproved(componentId, version, this.workspaceDir);
+        const frozen = new Set(ctx.ver.frozenByExecutionIds);
+        if (records.every((record) => frozen.has(record.id))) continue;
+        const contract = ctx.ver.artifactContract;
+        validateContract(contract);
+        const { component, sources } = componentFiles(ctx, contract);
+        const runtime = ctx.dossier.runtime === 'local_process_py' ? 'python' : 'node';
+        if (Object.keys(ctx.verifiedHostModules).length ||
+            !records.every((record) => matchesComponent(record, component, runtime))) {
+          throw new Error('已记录的版本与当前代码、依赖或契约不一致');
+        }
+        freezeComponentVersion(componentId, version, {
+          research: { executionIds: records.map((record) => record.id), sources },
+        }, this.workspaceDir);
+      } catch (error) {
+        console.warn('科研历史保留原有执行记录，需派生新版本以继续运行 ' + key + ': ' + errorMessage(error));
+      }
+    }
   }
 
   cancel(id: string): boolean {
@@ -239,13 +315,17 @@ export class ResearchEngine {
           studyId: initial.recipe.studyId, branchId: initial.recipe.branchId,
           componentId: step.componentId, version: step.version, inputs, parameters: step.parameters,
         };
+        const plan = this.planExecution(request);
         let result: ExecutionRecord;
         if (prior?.status === 'completed' && step.id !== rerunStep &&
-            canonicalJson(prior.request.inputs) === canonicalJson(inputs)) {
+            matchesComponent(prior, plan.component, plan.environment.runtime) &&
+            canonicalJson(prior.request.parameters) === canonicalJson(request.parameters) &&
+            canonicalJson(prior.inputs) === canonicalJson(plan.inputs) &&
+            canonicalJson(prior.environment) === canonicalJson(plan.environment)) {
           await Promise.all([...Object.values(prior.inputs), ...Object.values(prior.outputs)].map((artifact) => this.store.openArtifact(artifact)));
           result = prior;
         } else {
-          const job = this.startExecution(request, { recipeRunId: initial.id, recipeStepId: step.id });
+          const job = this.startPreparedExecution(request, plan, { recipeRunId: initial.id, recipeStepId: step.id });
           executionIds[step.id] = job.record.id;
           this.store.saveRecipeRun({ ...initial, executions: executionIds });
           const cancel = () => this.cancel(job.record.id);

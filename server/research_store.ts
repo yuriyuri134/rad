@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import Ajv from 'ajv';
 import type { ArtifactContract, ArtifactPort, ArtifactRecord, ExecutionRecord, RecipeRunRecord } from '../src/core/researchTypes.ts';
-import { canonicalJson, resolveWorkspaceDir, sha256 } from './storage.ts';
+import { canonicalJson, resolveResearchStoreDir, sha256 } from './storage.ts';
 
 const ajv = new Ajv({ strict: true, allErrors: true });
 const identifier = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
@@ -110,7 +110,7 @@ export class ResearchStore {
   readonly root: string;
 
   constructor(workspaceDir?: string) {
-    this.root = path.join(resolveWorkspaceDir(workspaceDir), 'workbench', 'research');
+    this.root = resolveResearchStoreDir(workspaceDir);
     for (const folder of ['records', 'recipes', 'imports', 'blobs', 'logs', 'staging']) {
       fs.mkdirSync(path.join(this.root, folder), { recursive: true });
     }
