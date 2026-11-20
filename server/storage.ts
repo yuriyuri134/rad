@@ -217,6 +217,13 @@ export function discoverLocalRelativeDependencies(
 
   const visited = new Set<string>();
   const queue: string[] = [entryAbs];
+  if (entryFile.endsWith('.py')) {
+    for (const dep of dependencies ?? []) {
+      if (dep.kind !== 'module' || !dep.targetId.startsWith('local:')) continue;
+      queue.push(path.resolve(resolvedRoot, dep.targetId.slice('local:'.length)));
+    }
+  }
+  const realRoot = fs.realpathSync(resolvedRoot);
   const deps: Array<{ relativePath: string; codeContent: string; codeHash: string }> = [];
 
   while (queue.length > 0) {
@@ -224,7 +231,13 @@ export function discoverLocalRelativeDependencies(
     if (visited.has(currentAbs)) continue;
     visited.add(currentAbs);
 
-    const code = fs.readFileSync(currentAbs, 'utf8');
+    const currentReal = fs.realpathSync(currentAbs);
+    const physicalRelative = path.relative(realRoot, currentReal);
+    const logicalRelative = path.relative(resolvedRoot, currentAbs);
+    if ([physicalRelative, logicalRelative].some((rel) => !rel || rel.startsWith('..') || path.isAbsolute(rel))) {
+      throw new Error('组件相对依赖越界：' + currentAbs);
+    }
+    const code = fs.readFileSync(currentReal, 'utf8');
     const currentRel = path.relative(resolvedRoot, currentAbs).replace(/\\/g, '/');
     if (currentAbs !== entryAbs) {
       deps.push({
@@ -1709,6 +1722,24 @@ function hydrateDossierLiveState(
   };
 
   const activeRec = dossier.versions.find((v) => v.version === dossier.activeVersion) ?? dossier.versions[0];
+  // Associate the legacy component-wide approval with its original active version
+  // before any operation can switch the active version.
+  if (activeRec?.approval === undefined &&
+      activeRec?.version === dossier.activeVersion &&
+      dossier.codeSecurityReview.status !== 'unreviewed_modified' &&
+      dossier.codeSecurityReview.approvedHash === activeRec.codeHash &&
+      activeRec.changeSummary !== '在 OpenLab Bench v2 组件库中新建初始版本') {
+    activeRec.approval = { ...dossier.codeSecurityReview };
+  }
+  if (activeRec) {
+    dossier.codeSecurityReview = activeRec.approval ?? {
+      ...dossier.codeSecurityReview,
+      status: 'unreviewed_modified',
+      approvedHash: null,
+      reviewedBy: null,
+      reviewedAt: null,
+    };
+  }
   let diskActualHash = activeRec?.codeHash;
   let diskTamperDetected = false;
   const frozenDriftDetected = hydratedVersions.some(
@@ -1883,7 +1914,7 @@ export function forkComponentVersion(
   if (!found) throw new Error(`未找到组件 ${params.componentId}`);
 
   const { componentsDir } = getWorkspacePaths(workspaceDir);
-  const { dossier, codeByVersion } = found;
+  const { dossier } = found;
   const baseRecord = dossier.versions.find((v) => v.version === params.baseVersion);
   if (!baseRecord) throw new Error(`未找到基线版本 ${params.baseVersion}`);
 
@@ -1898,9 +1929,6 @@ export function forkComponentVersion(
   atomicWriteFileSync(path.join(verDir, baseRecord.codeFile), params.codeContent);
 
   const newHash = sha256(params.codeContent);
-  const baseCode = codeByVersion[params.baseVersion];
-  const codeChanged = typeof baseCode !== 'string' || newHash !== sha256(baseCode);
-
   const newRecord: ComponentVersionRecord = {
     version: safeNewVersion,
     createdAt: new Date().toISOString(),
@@ -1910,6 +1938,7 @@ export function forkComponentVersion(
     codeHash: newHash,
     params: params.updatedParams,
     codeFile: baseRecord.codeFile,
+    approval: null,
     lifecycle: 'draft',
     frozenAt: null,
     frozenByRunIds: [],
@@ -1921,29 +1950,19 @@ export function forkComponentVersion(
   dossier.versions.unshift(newRecord);
   dossier.activeVersion = safeNewVersion;
 
-  if (codeChanged) {
-    dossier.codeSecurityReview = {
-      ...dossier.codeSecurityReview,
-      status: 'unreviewed_modified',
-      approvedHash: null,
-      reviewedBy: null,
-      reviewedAt: null,
-    };
-    dossier.selfCheck = {
-      status: 'unrun',
-      checkedAt: null,
-      checkedCodeHash: null,
-      summary: '新版本代码已改动，尚未运行自检',
-    };
-  } else {
-    dossier.codeSecurityReview = {
-      ...dossier.codeSecurityReview,
-      status: 'user_approved_hash',
-      approvedHash: newHash,
-      reviewedBy: 'rad (参数微调，源码未变)',
-      reviewedAt: new Date().toISOString(),
-    };
-  }
+  dossier.codeSecurityReview = {
+    ...dossier.codeSecurityReview,
+    status: 'unreviewed_modified',
+    approvedHash: null,
+    reviewedBy: null,
+    reviewedAt: null,
+  };
+  dossier.selfCheck = {
+    status: 'unrun',
+    checkedAt: null,
+    checkedCodeHash: null,
+    summary: '新版本尚未运行自检',
+  };
 
   saveComponentDossier(dossier, workspaceDir);
   return getComponent(dossier.id, workspaceDir)!.dossier;
@@ -2006,6 +2025,7 @@ export function saveComponentDraft(
     ver.changeSummary = params.changeSummary;
   }
 
+  if (codeChanged) ver.approval = null;
   if (codeChanged && dossier.activeVersion === ver.version) {
     dossier.codeSecurityReview = {
       ...dossier.codeSecurityReview,
@@ -2332,6 +2352,7 @@ export function approveComponentVersion(
   version: string,
   reviewer = 'rad',
   workspaceDir?: string,
+  expectedHash?: string,
 ): ComponentDossier {
   const found = getComponent(componentId, workspaceDir);
   if (!found) throw new Error(`未找到组件 ${componentId}`);
@@ -2346,6 +2367,9 @@ export function approveComponentVersion(
   }
   const actualDiskText = fs.readFileSync(codePath, 'utf8');
   const actualDiskHash = sha256(actualDiskText);
+  if (expectedHash !== undefined && expectedHash !== actualDiskHash) {
+    throw new Error('源码与审阅时的 SHA-256 不一致，请重新加载后审阅');
+  }
   const discoveredDeps = discoverLocalRelativeDependencies(versionDir, ver.codeFile, found.dossier.dependencies);
   const discoveredHostMods = discoverDeclaredHostModules(found.dossier.dependencies);
 
@@ -2405,6 +2429,7 @@ export function approveComponentVersion(
     reviewedBy: reviewer,
     reviewedAt: new Date().toISOString(),
   };
+  ver.approval = { ...found.dossier.codeSecurityReview };
 
   saveComponentDossier(found.dossier, workspaceDir);
   return getComponent(componentId, workspaceDir)!.dossier;
@@ -2420,22 +2445,14 @@ export function setActiveComponentVersion(
   const ver = found.dossier.versions.find((v) => v.version === version);
   if (!ver) throw new Error(`未找到版本 ${version}`);
 
-  const { componentsDir } = getWorkspacePaths(workspaceDir);
   found.dossier.activeVersion = version;
-  const codePath = path.join(componentsDir, path.basename(componentId), ver.version, ver.codeFile);
-  const actualHash = fs.existsSync(codePath) ? sha256(fs.readFileSync(codePath, 'utf8')) : ver.codeHash;
-  if (ver.author === 'system' && fs.existsSync(codePath) && actualHash === ver.codeHash) {
-    found.dossier.codeSecurityReview = {
-      ...found.dossier.codeSecurityReview,
-      status: 'builtin_reviewed',
-      approvedHash: actualHash,
-    };
-  } else if (found.dossier.codeSecurityReview.approvedHash !== actualHash) {
-    found.dossier.codeSecurityReview = {
-      ...found.dossier.codeSecurityReview,
-      status: 'unreviewed_modified',
-    };
-  }
+  found.dossier.codeSecurityReview = ver.approval ?? {
+    ...found.dossier.codeSecurityReview,
+    status: 'unreviewed_modified',
+    approvedHash: null,
+    reviewedBy: null,
+    reviewedAt: null,
+  };
   saveComponentDossier(found.dossier, workspaceDir);
   return getComponent(componentId, workspaceDir)!.dossier;
 }

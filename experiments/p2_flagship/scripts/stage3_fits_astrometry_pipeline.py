@@ -1,3 +1,5 @@
+import argparse
+from pathlib import Path
 import json
 import math
 import os
@@ -28,8 +30,6 @@ from wf_rc_models import (
 
 warnings.filterwarnings("ignore")
 
-FITS_DIR = "experiments/p2_flagship/runs/fits"
-os.makedirs(FITS_DIR, exist_ok=True)
 
 TILE_SIZE = 512
 PLATE_CRVAL_RA = 180.0
@@ -42,7 +42,10 @@ SKY_BG_E = 180.0
 
 def load_system_from_branch(branch_json_path):
     with open(branch_json_path, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
+        return build_system_from_prescription(json.load(fh))
+
+
+def build_system_from_prescription(data):
     lenses = []
     for item in data["lenses"]:
         lenses.append(
@@ -120,7 +123,7 @@ def compute_radial_centroid_and_psf_bank(sys, efl_mm, field_angles=FIELDS_DEG):
             cy_raw = float(np.sum(yy * psf_raw))
             cx_raw = float(np.sum(xx * psf_raw))
 
-            # Integrate/sample onto 15 um detector pixel grid using bilinear resampling over sub-pixel bins
+            # Integrate/sample onto 15 um detector pixel grid using nearest FFT grid samples over sub-pixel bins
             # Oversample 5x5 inside each 15 um pixel for flux-conserving integration
             sub_offsets = np.linspace(-0.4, 0.4, 5) * PIXEL_PITCH_UM
             oy, ox = np.meshgrid(out_coords, out_coords, indexing="ij")
@@ -154,37 +157,55 @@ def make_tile_wcs(fy_center_deg, efl_mm):
     return w, pixel_scale_deg
 
 
-def simulate_tile(sys_id, fy_center, efl_mm, r_grid_deg, dr_mm_grid, psf_bank, seed=42):
-    rng = np.random.default_rng(seed + int(round(fy_center * 1000)))
+def make_shared_starfield(field_deg, seed=42, reference_efl_mm=6000.0):
+    # Coordinates and fluxes are shared by all competing prescriptions.
+    rng = np.random.default_rng(seed)
+    wcs, _ = make_tile_wcs(field_deg, reference_efl_mm)
+    pixel_positions = []
+    for _ in range(2000):
+        x, y = rng.uniform(8, TILE_SIZE - 8, 2)
+        if all(math.hypot(x - sx, y - sy) >= 28 for sx, sy in pixel_positions):
+            pixel_positions.append((x, y))
+        if len(pixel_positions) == 28:
+            break
+    if len(pixel_positions) != 28:
+        raise ValueError("Failed to place 28 separated stars")
+    fluxes = np.geomspace(45000.0, 900.0, len(pixel_positions))
+    rng.shuffle(fluxes)
+    stars = []
+    for index, ((x, y), flux) in enumerate(zip(pixel_positions, fluxes), start=1):
+        ra, dec = wcs.pixel_to_world_values(x, y)
+        stars.append({"id": index, "ra": float(ra), "dec": float(dec), "flux_e": float(flux)})
+    return {"schema": "sky-injection/v1", "field_deg": field_deg, "seed": seed,
+            "reference_efl_mm": reference_efl_mm, "stars": stars}
+
+
+def add_detector_stamp(image, kernel, x_center, y_center, flux):
+    # Keep the on-detector part of the stamp without renormalizing the crop.
+    half_h, half_w = kernel.shape[0] // 2, kernel.shape[1] // 2
+    left, top = x_center - half_w, y_center - half_h
+    x0, x1 = max(0, left), min(image.shape[1], left + kernel.shape[1])
+    y0, y1 = max(0, top), min(image.shape[0], top + kernel.shape[0])
+    if x1 <= x0 or y1 <= y0:
+        return 0.0
+    portion = kernel[y0 - top:y1 - top, x0 - left:x1 - left]
+    image[y0:y1, x0:x1] += flux * portion
+    return float(portion.sum())
+
+
+def render_tile(sys_id, efl_mm, r_grid_deg, dr_mm_grid, psf_bank, starfield, noise_seed, fits_path):
+    fy_center = float(starfield["field_deg"])
+    rng = np.random.default_rng(noise_seed)
     wcs_tile, pix_scale_deg = make_tile_wcs(fy_center, efl_mm)
     pix_scale_arcsec = pix_scale_deg * 3600.0
-
-    # Nearest field PSF kernel from bank
-    nearest_fy = min(psf_bank.keys(), key=lambda f: abs(f - fy_center))
-    base_kernel = psf_bank[nearest_fy]
-    kh, kw = base_kernel.shape
-    half_k = kh // 2
-
-    # Generate 28 stars across [36, TILE_SIZE-36] with fluxes spanning bright (SNR~150) to faint (SNR~8)
-    n_stars = 28
-    # Keep stars well-separated (>= 26 px) for clean astrometry & photometry
-    star_pix = []
-    attempts = 0
-    while len(star_pix) < n_stars and attempts < 2000:
-        attempts += 1
-        tx = float(rng.uniform(38, TILE_SIZE - 38))
-        ty = float(rng.uniform(38, TILE_SIZE - 38))
-        if all(math.hypot(tx - sx, ty - sy) >= 28.0 for sx, sy in star_pix):
-            star_pix.append((tx, ty))
-
-    fluxes_e = np.geomspace(45000.0, 900.0, len(star_pix))
-    rng.shuffle(fluxes_e)
-
     image_e = np.full((TILE_SIZE, TILE_SIZE), SKY_BG_E, dtype=np.float64)
+    nearest_fy = min(psf_bank, key=lambda f: abs(f - fy_center))
+    base_kernel = psf_bank[nearest_fy]
     catalog = []
 
-    for idx, ((x_tan, y_tan), flux_e) in enumerate(zip(star_pix, fluxes_e)):
-        ra, dec = wcs_tile.pixel_to_world_values(x_tan, y_tan)
+    for star in starfield["stars"]:
+        ra, dec, flux_e = star["ra"], star["dec"], star["flux_e"]
+        x_tan, y_tan = wcs_tile.world_to_pixel_values(ra, dec)
         # Physical off-axis angle relative to optical axis (CRPIX in global frame)
         dx_axis_px = -(x_tan - (wcs_tile.wcs.crpix[0] - 1.0))  # East is -x
         dy_axis_px = y_tan - (wcs_tile.wcs.crpix[1] - 1.0)
@@ -217,14 +238,17 @@ def simulate_tile(sys_id, fy_center, efl_mm, r_grid_deg, dr_mm_grid, psf_bank, s
         if ksum > 0:
             k_shifted /= ksum
 
-        y0, y1 = iy - half_k, iy + half_k + 1
-        x0, x1 = ix - half_k, ix + half_k + 1
-        if y0 >= 0 and y1 <= TILE_SIZE and x0 >= 0 and x1 <= TILE_SIZE:
-            image_e[y0:y1, x0:x1] += flux_e * k_shifted
+        retained = add_detector_stamp(image_e, k_shifted, ix, iy, flux_e)
+        centroid_on_detector = -0.5 <= x_opt < TILE_SIZE - 0.5 and -0.5 <= y_opt < TILE_SIZE - 0.5
+        eligible = retained >= 0.90 and centroid_on_detector
 
         catalog.append(
             {
-                "id": idx + 1,
+                "id": star["id"],
+                "rendered": retained > 0.0,
+                "retained_energy_fraction": min(1.0, retained),
+                "centroid_on_detector": bool(centroid_on_detector),
+                "eligible": bool(eligible),
                 "ra": float(ra),
                 "dec": float(dec),
                 "x_tan": float(x_tan),
@@ -249,8 +273,37 @@ def simulate_tile(sys_id, fy_center, efl_mm, r_grid_deg, dr_mm_grid, psf_bank, s
     hdr["EFL_MM"] = (float(efl_mm), "Effective focal length (mm)")
     hdr["GAIN"] = (GAIN_E_PER_ADU, "e-/ADU")
     hdr["RDNOISE"] = (READ_NOISE_E, "e- RMS")
-    fits_path = os.path.join(FITS_DIR, f"{sys_id}_tile_{fy_center:.2f}deg.fits")
-    fits.PrimaryHDU(data=adu.astype(np.float32), header=hdr).writeto(fits_path, overwrite=True)
+    fits_path = Path(fits_path)
+    hdr["SKYSEED"] = int(starfield["seed"])
+    hdr["NOISESED"] = int(noise_seed)
+    fits.PrimaryHDU(data=adu.astype(np.float32), header=hdr).writeto(fits_path)
+    return {
+        "schema": "detector-truth/v1", "system": sys_id, "field_deg": fy_center,
+        "pixel_scale_arcsec": pix_scale_arcsec, "noise_seed": noise_seed,
+        "starfield_seed": starfield["seed"], "stars": catalog,
+        "eligibility": {"min_retained_energy_fraction": 0.90, "require_centroid_on_detector": True},
+        "model": {
+            "wavelengths_um": list(WLS_UM), "weights": [1 / len(WLS_UM)] * len(WLS_UM),
+            "psf_trace_rays": 160, "fft_grid": 512, "detector_pitch_um": PIXEL_PITCH_UM,
+            "detector_integration": "5x5 nearest FFT-grid samples per detector pixel",
+            "spatial_psf": "nearest radial field PSF rotated to local radial direction",
+            "stamp_interpolation": "linear rotation and shift of the sampled detector PSF",
+            "distortion": "radial odd polynomial fit to geometric centroids",
+            "edge_energy": "fraction of the normalized finite stamp inside the detector",
+            "noise": {"sky_e": SKY_BG_E, "read_noise_e": READ_NOISE_E, "gain_e_per_adu": GAIN_E_PER_ADU},
+        },
+    }
+
+
+def simulate_tile(sys_id, fy_center, efl_mm, r_grid_deg, dr_mm_grid, psf_bank, output_dir):
+    field_seed = 42 + int(round(fy_center * 1000))
+    starfield = make_shared_starfield(fy_center, field_seed)
+    fits_path = Path(output_dir) / f"{sys_id}_tile_{fy_center:.2f}deg.fits"
+    truth = render_tile(sys_id, efl_mm, r_grid_deg, dr_mm_grid, psf_bank,
+                        starfield, 10000 + field_seed, fits_path)
+    fits_path.with_suffix(".truth.json").write_text(json.dumps(truth, indent=2, allow_nan=False), encoding="utf-8")
+    catalog = [star for star in truth["stars"] if star["eligible"]]
+    pix_scale_arcsec = truth["pixel_scale_arcsec"]
 
     # --- Source Extraction 1: Photutils DAOStarFinder ---
     with fits.open(fits_path) as hdul:
@@ -316,7 +369,7 @@ def simulate_tile(sys_id, fy_center, efl_mm, r_grid_deg, dr_mm_grid, psf_bank, s
             "n_truth": len(catalog),
             "n_detected": len(det_x),
             "n_matched": len(matched_nodist_err_as),
-            "completeness_pct": round(100.0 * len(matched_nodist_err_as) / len(catalog), 1),
+            "completeness_pct": round(100.0 * len(matched_nodist_err_as) / len(catalog), 1) if catalog else None,
             "astrometry_raw_wcs_rms_arcsec": round(float(np.sqrt(np.mean(np.square(matched_raw_err_as)))), 4) if matched_raw_err_as else None,
             "astrometry_post_dist_rms_arcsec": round(float(np.sqrt(np.mean(np.square(matched_nodist_err_as)))), 4) if matched_nodist_err_as else None,
             "median_fwhm_arcsec": round(float(np.median(fwhm_as_list)), 3) if fwhm_as_list else None,
@@ -331,7 +384,9 @@ def simulate_tile(sys_id, fy_center, efl_mm, r_grid_deg, dr_mm_grid, psf_bank, s
 
     return {
         "field_deg": fy_center,
-        "fits_path": fits_path,
+        "fits_path": str(fits_path),
+        "truth_path": str(fits_path.with_suffix(".truth.json")),
+        "effective_field_retention": len(catalog) / len(truth["stars"]),
         "sky_rms_adu": round(float(std_bg), 3),
         "photutils": analyze_detections(dao_x, dao_y, "photutils_DAOStarFinder"),
         "sep": analyze_detections(sep_x, sep_y, "sep_extract"),
@@ -374,6 +429,10 @@ def check_image_simulation_engine(sys_obj, label):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-dir", type=Path, required=True)
+    args = parser.parse_args()
+    args.output_dir.mkdir(parents=True, exist_ok=False)
     t0 = time.perf_counter()
     # Load S0 (bare RC)
     s0 = build_rc_corrector([], d_m1_l1=450.0, bfl=0.0, apply_obsc=True, name="S0_bare_rc")
@@ -392,7 +451,7 @@ def main():
         r_grid, dr_grid, psf_bank = compute_radial_centroid_and_psf_bank(sys_obj, efl_mm)
         tiles = []
         for fy in FIELDS_DEG:
-            t_res = simulate_tile(sys_id, fy, efl_mm, r_grid, dr_grid, psf_bank)
+            t_res = simulate_tile(sys_id, fy, efl_mm, r_grid, dr_grid, psf_bank, args.output_dir)
             tiles.append(t_res)
             print(
                 f"  fy={fy:.2f}deg | Photutils: comp={t_res['photutils']['completeness_pct']}%, "
@@ -408,7 +467,7 @@ def main():
             "tiles": tiles,
             "elapsed_s": round(time.perf_counter() - ts, 2),
         }
-        with open("experiments/p2_flagship/runs/stage3_fits_astrometry.partial.json", "w", encoding="utf-8") as fh:
+        with open(args.output_dir / "stage3_fits_astrometry.partial.json", "w", encoding="utf-8") as fh:
             json.dump({"systems": results}, fh, indent=2, ensure_ascii=False)
 
     # Cross-check ImageSimulationEngine on winning system (S3)
@@ -424,7 +483,7 @@ def main():
         "image_simulation_engine_audit": img_sim_audit,
         "total_elapsed_s": round(time.perf_counter() - t0, 2),
     }
-    out_path = "experiments/p2_flagship/runs/stage3_fits_astrometry.json"
+    out_path = args.output_dir / "stage3_fits_astrometry.json"
     with open(out_path, "w", encoding="utf-8") as fh:
         json.dump(summary, fh, indent=2, ensure_ascii=False)
     print(f"\nSaved {out_path}", flush=True)

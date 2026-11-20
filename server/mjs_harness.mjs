@@ -182,10 +182,12 @@ async function importVerifiedOpticsHostModule(verifiedHostModules) {
   return await import(dataUrl);
 }
 
-function buildTraceHelper(solverId, pythonBridgePath, opticsMod) {
+function buildTraceHelper(solverId, pythonBridgePath, opticsMod, pythonInvocation) {
   if (solverId === 'solver-optiland-python') {
     return (spec) => {
-      const stdout = execFileSync('python3', [pythonBridgePath, '--solve'], {
+      const executable = pythonInvocation?.executable ?? process.env.OPENLAB_PYTHON_BIN ?? 'python3';
+      const args = pythonInvocation?.args ?? [pythonBridgePath, '--solve'];
+      const stdout = execFileSync(executable, args, {
         input: JSON.stringify({ systemSpec: spec }),
         encoding: 'utf8',
         timeout: 15000,
@@ -293,7 +295,7 @@ async function main() {
         : await importVerifiedOpticsHostModule(solverVerifiedHostModules || verifiedHostModules);
     const pythonBridgePath =
       process.env.OPENLAB_OPTILAND_BRIDGE || path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
-    const traceFn = buildTraceHelper(solverId, pythonBridgePath, solverOpticsMod);
+    const traceFn = buildTraceHelper(solverId, pythonBridgePath, solverOpticsMod, payload.pythonInvocation);
     const helpers = {
       extractVariables: optOpticsMod.extractVariables,
       applyVariableVector: optOpticsMod.applyVariableVector,

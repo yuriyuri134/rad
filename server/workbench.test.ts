@@ -43,6 +43,9 @@ test('workbench seeds WF-RC-1000 with authentic S0-S4 metrics, 20 FITS tiles, an
     const s3 = wb.branches.find((b) => b.id === 'branch-p2-s3');
     assert.ok(s3);
     assert.ok(Math.abs(Number(s3.metrics.maxRmsPolyUm) - 1.063) < 0.05);
+    assert.equal(s3.metrics.mcBflOnlyYield7_5Pct, 100);
+    assert.equal(s3.metrics.mcBflOnlyP50RmsUm, 3.781);
+    assert.equal(s3.metrics.mcM2ShimP95RmsUm, 3.086);
     assert.equal(wb.fitsCatalog.length, 20, 'Expected all 20 P2 FITS tiles in catalog');
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });

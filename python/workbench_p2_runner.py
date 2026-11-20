@@ -26,8 +26,9 @@ from typing import Any
 
 warnings.filterwarnings("ignore")
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-P2_SCRIPTS_DIR = REPO_ROOT / "experiments" / "p2_flagship" / "scripts"
+SOURCE_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(os.environ.get("OPENLAB_LEGACY_DATA_ROOT", SOURCE_ROOT)).resolve()
+P2_SCRIPTS_DIR = SOURCE_ROOT / "experiments" / "p2_flagship" / "scripts"
 P2_RUNS_DIR = REPO_ROOT / "experiments" / "p2_flagship" / "runs"
 
 if str(P2_SCRIPTS_DIR) not in sys.path:
@@ -244,7 +245,7 @@ def run_fits_star_extract(params: dict[str, Any]) -> dict[str, Any]:
 
     rel_path = str(params.get("fitsPath", "experiments/p2_flagship/runs/fits/S3_3Lens_Wynne_FS_QuasiRC_tile_0.60deg.fits"))
     abs_path = (REPO_ROOT / rel_path).resolve()
-    if not abs_path.exists() or not str(abs_path).startswith(str(REPO_ROOT.resolve())):
+    if not abs_path.is_file() or not abs_path.is_relative_to((P2_RUNS_DIR / "fits").resolve()):
         raise FileNotFoundError(f"非法的 FITS 文件路径: {rel_path}")
 
     extractor = str(params.get("extractor", "photutils_DAOStarFinder"))

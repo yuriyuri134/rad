@@ -80,6 +80,17 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
 
+  // This service can approve and run local code. Accept only direct local browser/API requests.
+  app.use((req, res, next) => {
+    const host = req.get('host') ?? '';
+    const origin = req.get('origin');
+    if (!/^(127\.0\.0\.1|localhost)(:\d+)?$/i.test(host) ||
+        (origin !== undefined && origin !== 'http://' + host)) {
+      res.status(403).json({ error: '仅接受本机同源请求' });
+      return;
+    }
+    next();
+  });
   app.use(express.json({ limit: '15mb' }));
 
   app.get('/api/environment', async (_req, res) => {
@@ -630,8 +641,9 @@ async function startServer() {
 
   app.post('/api/components/:id/approve', (req, res) => {
     try {
-      const { version, reviewer } = req.body as { version: string; reviewer?: string };
-      const dossier = approveComponentVersion(req.params.id, version, reviewer || 'rad');
+      const { version, reviewer, expectedHash } = req.body as { version: string; reviewer?: string; expectedHash?: string };
+      if (!expectedHash || !/^[a-f0-9]{64}$/.test(expectedHash)) throw new Error('缺少已审阅的 SHA-256');
+      const dossier = approveComponentVersion(req.params.id, version, reviewer || 'rad', undefined, expectedHash);
       res.json(getComponent(dossier.id));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -1182,7 +1194,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`OpenLab Bench running at http://localhost:${PORT}`);
   });
 }

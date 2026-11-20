@@ -1,3 +1,5 @@
+import { createNewComponent } from './workbench.ts';
+import { resolveAndAssertApproved } from './runner.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,7 +25,9 @@ import { traceOpticalSystem } from '../src/core/optics.ts';
 test('Security hygiene: server/runner.ts must not import node:vm', () => {
   const runnerSrc = fs.readFileSync(path.resolve(process.cwd(), 'server', 'runner.ts'), 'utf8');
   assert.equal(runnerSrc.includes('node:vm'), false);
-  assert.ok(runnerSrc.includes('execFile'));
+  const processSrc = fs.readFileSync(path.resolve(process.cwd(), 'server', 'process.ts'), 'utf8');
+  assert.ok(runnerSrc.includes('runLocalProcess'));
+  assert.ok(processSrc.includes('spawn(executable, args'));
 });
 
 test('Forked evaluator blocks until 64-char SHA-256 hash approved, passes selfCheck, refuses insufficient_artifacts, and catches disk tampering', async () => {
@@ -241,5 +245,33 @@ test('Optimizer runs via execFile harness, Optiland solver reports container rea
   assert.equal(verifyRunIntegrity(tamperedRun), 'tampered');
   } finally {
     fs.rmSync(tmpWs, { recursive: true, force: true });
+  }
+});
+
+
+test('approval remains bound to the selected version and reviewed source', () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'openlab-approval-'));
+  try {
+    const source = 'export function run() { return {}; }';
+    const component = createNewComponent({
+      id: 'approval-regression', name: 'Approval regression', kind: 'analysis_plugin',
+      runtime: 'local_process_mjs', summary: 'Approval', purpose: 'Approval regression',
+      codeContent: source,
+    }, ws);
+    assert.throws(() => resolveAndAssertApproved(component.id, 'v0.1', ws), /安全审查拦截/);
+    assert.throws(() => approveComponentVersion(component.id, 'v0.1', 'reviewer', ws, '0'.repeat(64)), /SHA-256/);
+    approveComponentVersion(component.id, 'v0.1', 'reviewer', ws);
+    forkComponentVersion({
+      componentId: component.id, baseVersion: 'v0.1', newVersion: 'v0.2',
+      changeSummary: 'Same implementation, different version', codeContent: source, updatedParams: {},
+    }, ws);
+    approveComponentVersion(component.id, 'v0.1', 'reviewer', ws);
+    assert.throws(() => resolveAndAssertApproved(component.id, 'v0.2', ws), /安全审查拦截/);
+    assert.equal(resolveAndAssertApproved(component.id, 'v0.1', ws).verifiedCode, source);
+    approveComponentVersion(component.id, 'v0.2', 'reviewer', ws);
+    assert.equal(resolveAndAssertApproved(component.id, 'v0.2', ws).verifiedCode, source);
+    assert.equal(resolveAndAssertApproved(component.id, 'v0.1', ws).verifiedCode, source);
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
   }
 });

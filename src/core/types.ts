@@ -103,6 +103,7 @@ export interface ComponentVersionRecord {
   codeHash: string; // Full 64-char SHA-256 hex digest
   params: Record<string, number | string | boolean>;
   codeFile: string;
+  approval?: CodeSecurityReviewState | null;
   lifecycle?: ComponentVersionLifecycle;
   frozenAt?: string | null;
   frozenByRunIds?: string[];

@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildArchitectureMap } from '../src/core/architectureMap.ts';
@@ -25,87 +24,53 @@ import {
   sha256,
 } from './storage.ts';
 import { resolvePythonBinary } from './python_env.ts';
+import { pythonEnvironment, readVerifiedSource, runLocalProcess, stageVerifiedPython } from './process.ts';
 
 const MJS_HARNESS_PATH = path.resolve(process.cwd(), 'server', 'mjs_harness.mjs');
 const PYTHON_BRIDGE_PATH = path.resolve(process.cwd(), 'python', 'optiland_bridge.py');
 
-const PYTHON_VERIFIED_BOOTSTRAP = [
-  'import base64, hashlib, os, sys',
-  'code_bytes = base64.b64decode(os.environ["OPENLAB_PY_SOURCE_B64"])',
-  'actual_hash = hashlib.sha256(code_bytes).hexdigest()',
-  'expected_hash = os.environ["OPENLAB_EXPECTED_HASH"]',
-  'if actual_hash != expected_hash:',
-  '    sys.stderr.write(f"TOCTOU/哈希校验失败: actual={actual_hash} expected={expected_hash}\\n")',
-  '    sys.exit(1)',
-  'impl_path = os.environ.get("OPENLAB_IMPL_PATH", "impl.py")',
-  'sys.argv = [impl_path, *sys.argv[1:]]',
-  'ns = {"__name__": "__main__", "__file__": impl_path}',
-  'exec(compile(code_bytes.decode("utf-8"), impl_path, "exec"), ns)',
-].join('\n');
+const OPTILAND_BRIDGE_HASH = '0ead67d84c16b019be9c6b0cf481ba169719c5b67bf947c2edf7f08f86848fe9';
 
 function runProcessWithStdin(
-  cmd: string,
-  args: string[],
-  stdinText: string,
-  timeoutMs = 20000,
-  extraEnv?: Record<string, string>,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  return new Promise((resolve, reject) => {
-    const proc = execFile(
-      cmd,
-      args,
-      {
-        timeout: timeoutMs,
-        maxBuffer: 16 * 1024 * 1024,
-        env: {
-          ...process.env,
-          OPENLAB_OPTILAND_BRIDGE: PYTHON_BRIDGE_PATH,
-          ...(extraEnv ?? {}),
-        },
-      },
-      (err, stdout, stderr) => {
-        if (err) {
-          const code = typeof (err as NodeJS.ErrnoException & { code?: unknown }).code === 'number'
-            ? Number((err as NodeJS.ErrnoException & { code?: unknown }).code)
-            : 1;
-          // If process exited with structured JSON on stdout (e.g. exit code 2 env_unavailable), return it cleanly
-          if (stdout && stdout.trim().startsWith('{')) {
-            resolve({ stdout, stderr, exitCode: code });
-            return;
-          }
-          reject(new Error(stderr?.trim() || err.message));
-          return;
-        }
-        resolve({ stdout, stderr, exitCode: 0 });
-      },
-    );
-    if (stdinText) {
-      proc.stdin?.write(stdinText);
-    }
-    proc.stdin?.end();
-  });
+  executable: string, args: string[], input: string, timeoutMs = 20000,
+) {
+  return runLocalProcess(executable, args, input, timeoutMs);
 }
 
-function runVerifiedPythonComponent(
-  verifiedCode: string,
-  verifiedHash: string,
-  implPath: string,
+function preparePythonComponent(
+  code: string,
+  codeHash: string,
+  dependencies: ApprovedComponentExecutionContext['verifiedRelativeDeps'],
   cliFlag: string,
-  stdinText: string,
-  timeoutMs = 15000,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const { executable } = resolvePythonBinary();
-  return runProcessWithStdin(
-    executable,
-    ['-c', PYTHON_VERIFIED_BOOTSTRAP, cliFlag],
-    stdinText,
-    timeoutMs,
-    {
-      OPENLAB_PY_SOURCE_B64: Buffer.from(verifiedCode, 'utf8').toString('base64'),
-      OPENLAB_EXPECTED_HASH: verifiedHash,
-      OPENLAB_IMPL_PATH: implPath,
-    },
-  );
+  includeOptilandBridge: boolean,
+) {
+  const sources = { ...dependencies, 'openlab_component.py': { code, codeHash } };
+  const bridge = 'openlab_optiland_bridge.py';
+  if (includeOptilandBridge) {
+    Object.assign(sources, { [bridge]: readVerifiedSource(PYTHON_BRIDGE_PATH, OPTILAND_BRIDGE_HASH) });
+  }
+  const stage = stageVerifiedPython('openlab_component.py', sources);
+  return {
+    executable: resolvePythonBinary().executable,
+    args: [...stage.args, cliFlag],
+    dispose: stage.dispose,
+    env: pythonEnvironment({
+      OPENLAB_OPTILAND_BRIDGE: includeOptilandBridge ? path.join(stage.directory, bridge) : undefined,
+    }),
+  };
+}
+
+async function runVerifiedPythonComponent(
+  code: string, codeHash: string,
+  dependencies: ApprovedComponentExecutionContext['verifiedRelativeDeps'],
+  cliFlag: string, input: string, timeoutMs: number, includeOptilandBridge = false,
+) {
+  const invocation = preparePythonComponent(code, codeHash, dependencies, cliFlag, includeOptilandBridge);
+  try {
+    return await runLocalProcess(invocation.executable, invocation.args, input, timeoutMs, invocation.env);
+  } finally {
+    invocation.dispose();
+  }
 }
 
 function getComponentImplPath(
@@ -283,13 +248,8 @@ export function resolveAndAssertApproved(
       primaryFromCas = false;
     }
 
-    const isActive = versionTag === dossier.activeVersion;
-    const review = dossier.codeSecurityReview;
-    const approvedForCas = isActive
-      ? review.approvedHash === primaryHash || (!review.approvedHash && review.status === 'builtin_reviewed')
-      : ver.author === 'system' ||
-        (ver.frozenByRunIds && ver.frozenByRunIds.length > 0) ||
-        review.approvedHash === primaryHash;
+    const approvedForCas = ver.approval?.approvedHash === primaryHash ||
+      (ver.approval === undefined && (ver.author === 'system' || Boolean(ver.frozenByRunIds?.length)));
 
     if (!approvedForCas) {
       throw new Error(
@@ -326,16 +286,7 @@ export function resolveAndAssertApproved(
       `安全审查拦截：组件 ${dossier.name} (${ver.version}) 源码已修改或磁盘哈希 (${diskHash.slice(0, 12)}...) 与已确认哈希不一致。本地子进程非 OS 安全沙箱，请先在组件库核对代码并确认哈希。`,
     );
   }
-  if (
-    dossier.codeSecurityReview.approvedHash &&
-    versionTag === dossier.activeVersion &&
-    diskHash !== dossier.codeSecurityReview.approvedHash
-  ) {
-    throw new Error(
-      `安全审查拦截：组件 ${dossier.name} (${ver.version}) 磁盘 SHA-256 哈希与已确认记录不一致，拒绝执行。`,
-    );
-  }
-  if (!dossier.codeSecurityReview.approvedHash && dossier.codeSecurityReview.status !== 'builtin_reviewed') {
+  if (ver.approval?.approvedHash !== diskHash || ver.approval.status === 'unreviewed_modified') {
     throw new Error(
       `安全审查拦截：组件 ${dossier.name} (${ver.version}) 尚未经人工哈希确认，禁止直接执行。`,
     );
@@ -354,7 +305,7 @@ export function resolveAndAssertApproved(
         `安全审查拦截：组件 ${dossier.name} (${ver.version}) 的相对依赖已发生变更或缺失，请重新核对并确认哈希。`,
       );
     }
-  } else if (discoveredDeps.length > 0 && ver.lifecycle === 'frozen') {
+  } else if (discoveredDeps.length > 0 && (ver.lifecycle === 'frozen' || dossier.runtime === 'local_process_py')) {
     throw new Error(
       `安全校验失败：冻结组件 ${dossier.id}@${ver.version} 包含未在 CAS 固定的相对依赖，禁止直接执行。`,
     );
@@ -411,8 +362,8 @@ export async function probePythonEnvironment(): Promise<{
   rawProbe: Record<string, unknown>;
 }> {
   try {
-    const { executable } = resolvePythonBinary();
-    const { stdout } = await runProcessWithStdin(executable, [PYTHON_BRIDGE_PATH, '--probe'], '', 5000);
+    const source = readVerifiedSource(PYTHON_BRIDGE_PATH, OPTILAND_BRIDGE_HASH);
+    const { stdout } = await runVerifiedPythonComponent(source.code, source.codeHash, {}, '--probe', '', 15000);
     const probe = JSON.parse(stdout) as {
       pythonVersion?: string | null;
       pythonOkForOptiland?: boolean;
@@ -448,7 +399,9 @@ export async function runComponentSelfCheck(
   const now = new Date().toISOString();
 
   if (dossier.runtime === 'local_process_py') {
-    const { stdout } = await runVerifiedPythonComponent(verifiedCode, verifiedHash, implPath, '--check', '', 30000);
+    const { stdout } = await runVerifiedPythonComponent(
+      verifiedCode, verifiedHash, verifiedRelativeDeps, '--check', '', 90000, dossier.id === 'solver-optiland-python',
+    );
     const parsed = JSON.parse(stdout || '{}') as {
       status?: string;
       passed?: boolean;
@@ -545,10 +498,11 @@ export async function runSolverComponent(
     const { stdout, exitCode } = await runVerifiedPythonComponent(
       verifiedCode,
       verifiedHash,
-      implPath,
+      verifiedRelativeDeps,
       '--solve',
       JSON.stringify({ systemSpec: spec }),
-      30000,
+      90000,
+      dossier.id === 'solver-optiland-python',
     );
     const parsed = JSON.parse(stdout || '{}') as {
       status?: string;
@@ -690,10 +644,10 @@ export async function runOptimizerComponent(params: {
   const mergedOptParams = { ...opt.ver.params, ...(params.overrideOptimizerParams ?? {}) };
   const mergedEvalParams = { ...ev.ver.params, ...(params.overrideEvaluatorParams ?? {}) };
 
-  const { stdout } = await runProcessWithStdin(
-    'node',
-    ['--no-warnings', MJS_HARNESS_PATH],
-    JSON.stringify({
+  const python = solverCheck.dossier.id === 'solver-optiland-python'
+    ? preparePythonComponent(solverCheck.verifiedCode, solverCheck.verifiedHash, solverCheck.verifiedRelativeDeps, '--solve', true)
+    : null;
+  const optimizerInput = JSON.stringify({
       action: 'optimize',
       implPath: opt.implPath,
       verifiedCode: opt.verifiedCode,
@@ -709,10 +663,12 @@ export async function runOptimizerComponent(params: {
       params: mergedOptParams,
       evalParams: mergedEvalParams,
       solverId: solverCheck.dossier.id,
+      pythonInvocation: python && { executable: python.executable, args: python.args },
       initialSpec: params.initialSpec,
-    }),
-    30000,
-  );
+    });
+  const { stdout } = await runLocalProcess(
+    process.execPath, ['--no-warnings', MJS_HARNESS_PATH], optimizerInput, python ? 240000 : 30000, python?.env,
+  ).finally(() => python?.dispose());
 
   const result = JSON.parse(stdout) as {
     bestSpec: OpticalSystemSpec;
@@ -801,10 +757,11 @@ export async function runStandaloneComponent(params: {
     const { stdout } = await runVerifiedPythonComponent(
       verifiedCode,
       verifiedHash,
-      implPath,
+      verifiedRelativeDeps,
       '--solve',
       JSON.stringify({ systemSpec: params.spec ?? params.customInput ?? {} }),
       30000,
+      dossier.id === 'solver-optiland-python',
     );
     return {
       componentId: dossier.id,

@@ -34,7 +34,7 @@ export function resolvePythonBinary(): { executable: string; source: DiscoveredP
     candidates.push({ exe: process.env.OPENLAB_PYTHON_BIN.trim(), source: 'env_override' });
   }
   candidates.push(
-    { exe: path.resolve(process.cwd(), '.venv', 'bin', 'python'), source: 'local_venv' },
+    { exe: path.resolve(process.cwd(), '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'), source: 'local_venv' },
     { exe: '/tmp/p2_venv/bin/python', source: 'tmp_p2_venv' },
     { exe: 'python3', source: 'system_path' },
   );
